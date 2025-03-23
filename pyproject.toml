@@ -1,7 +1,6 @@
-# https://setuptools.pypa.io/en/latest/userguide/quickstart.html
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.0.0"]
+build-backend = "hatchling.build"
 
 [tool.black]
 line-length = 88
@@ -57,31 +56,19 @@ profile = "black"
 # See https://docs.astral.sh/ruff/configuration/#using-pyprojecttoml for configuration documentation
 select = ["E", "F", "I"]
 
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["."]
-namespaces = false
-
 [project]
 name = "fast-seqfunc"
 version = "0.0.1"
 # NOTE: move dependencies into this section if you need to distribute the project as a Python package.
 requires-python = ">=3.10"
 dependencies = [
-    "matplotlib",
-    "pandas",
-    "scikit-learn",
-    "numpy",
-    "pyprojroot",
-    "scipy",
-    "pymc",
-    "seaborn",
-    "python-dotenv",
-    "typer",
-    "jax",
-]
+    "typer>=0.9.0",
+    "numpy>=1.22.0",
+    "pandas>=1.5.0",
+    "scikit-learn>=1.2.0",
+    "loguru>=0.7.0",
+    "pycaret>=2.2.3,<4"
+, "lazy-loader>=0.4,<0.5"]
 readme = "README.md"
 
 [project.scripts]
@@ -102,6 +89,12 @@ fast-seqfunc = { path = ".", editable = true }
 
 # NOTE: Core dependencies (needed for running the program) go here.
 [tool.pixi.dependencies]
+pycaret = ">=2.2.3,<4"
+typer = ">=0.9.0"
+numpy = ">=1.22.0"
+pandas = ">=1.5.0"
+scikit-learn = ">=1.2.0"
+loguru = ">=0.7.0"
 
 # NOTE: Testing dependencies (not needed for running program) go here.
 [tool.pixi.feature.tests.dependencies]
