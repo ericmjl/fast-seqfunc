@@ -2,7 +2,11 @@
 
 This is the file from which you can do:
 
-    from fast_seqfunc import some_function
+    from fast_seqfunc import train_model, predict, load_model
 
-Use it to control the top-level API of your Python data science project.
+Provides a simple interface for sequence-function modeling of proteins and nucleotides.
 """
+
+from fast_seqfunc.core import load_model, predict, train_model
+
+__all__ = ["train_model", "predict", "load_model"]
