@@ -151,3 +151,4 @@ docs/cli.md
 .pixi
 message_log.db
 catboost_info/*
+examples/output/*
