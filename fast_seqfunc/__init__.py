@@ -15,4 +15,36 @@ from fast_seqfunc.core import (
     train_model,
 )
 
-__all__ = ["train_model", "predict", "save_model", "load_model", "evaluate_model"]
+# Import synthetic data generation functions
+from fast_seqfunc.synthetic import (
+    create_classification_task,
+    create_g_count_task,
+    create_gc_content_task,
+    create_interaction_task,
+    create_length_dependent_task,
+    create_motif_count_task,
+    create_motif_position_task,
+    create_multiclass_task,
+    create_nonlinear_composition_task,
+    generate_dataset_by_task,
+)
+
+__all__ = [
+    # Core functionality
+    "train_model",
+    "predict",
+    "save_model",
+    "load_model",
+    "evaluate_model",
+    # Synthetic data
+    "create_g_count_task",
+    "create_gc_content_task",
+    "create_motif_position_task",
+    "create_motif_count_task",
+    "create_length_dependent_task",
+    "create_nonlinear_composition_task",
+    "create_interaction_task",
+    "create_classification_task",
+    "create_multiclass_task",
+    "generate_dataset_by_task",
+]
