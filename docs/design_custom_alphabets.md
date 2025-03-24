@@ -13,6 +13,7 @@ The current implementation in fast-seqfunc handles alphabets in a straightforwar
 3. The embedder assumes each position in the sequence maps to a single character in the alphabet.
 4. Pre-defined alphabets are hardcoded for common sequence types (protein, DNA, RNA).
 5. No support for custom alphabets beyond the standard ones.
+6. Sequences of different lengths are padded to the maximum length with a configurable gap character.
 
 This approach works well for standard biological sequences but has limitations for:
 
@@ -45,6 +46,7 @@ class Alphabet:
     :param delimiter: Optional delimiter used when tokenizing sequences
     :param name: Optional name for this alphabet
     :param description: Optional description
+    :param gap_character: Character to use for padding sequences (default: "-")
     """
 
     def __init__(
@@ -53,14 +55,20 @@ class Alphabet:
         delimiter: Optional[str] = None,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        gap_character: str = "-",
     ):
+        # Ensure gap character is included in tokens
+        all_tokens = set(tokens)
+        all_tokens.add(gap_character)
+
         # Store unique tokens in a deterministic order
-        self.tokens = sorted(set(tokens))
+        self.tokens = sorted(all_tokens)
         self.token_to_idx = {token: idx for idx, token in enumerate(self.tokens)}
         self.idx_to_token = {idx: token for idx, token in enumerate(self.tokens)}
         self.name = name or "custom"
         self.description = description
         self.delimiter = delimiter
+        self.gap_character = gap_character
 
         # Derive regex pattern for tokenization if no delimiter is specified
         if not delimiter and any(len(token) > 1 for token in self.tokens):
@@ -94,6 +102,34 @@ class Alphabet:
         else:
             # Default: treat each character as a token
             return list(sequence)
+
+    def pad_sequence(self, sequence: str, length: int) -> str:
+        """Pad a sequence to the specified length.
+
+        :param sequence: The sequence to pad
+        :param length: Target length
+        :return: Padded sequence
+        """
+        tokens = self.tokenize(sequence)
+        if len(tokens) >= length:
+            # Truncate if needed
+            return self.tokens_to_sequence(tokens[:length])
+        else:
+            # Pad with gap character
+            padding_needed = length - len(tokens)
+            padded_tokens = tokens + [self.gap_character] * padding_needed
+            return self.tokens_to_sequence(padded_tokens)
+
+    def tokens_to_sequence(self, tokens: List[str]) -> str:
+        """Convert tokens back to a sequence string.
+
+        :param tokens: List of tokens
+        :return: Sequence string
+        """
+        if self.delimiter is not None:
+            return self.delimiter.join(tokens)
+        else:
+            return "".join(tokens)
 
     def indices_to_sequence(self, indices: Sequence[int], delimiter: Optional[str] = None) -> str:
         """Convert a list of token indices back to a sequence string.
@@ -151,6 +187,7 @@ class Alphabet:
             delimiter=config.get("delimiter"),
             name=config.get("name"),
             description=config.get("description"),
+            gap_character=config.get("gap_character", "-"),
         )
 
     @classmethod
@@ -175,6 +212,7 @@ class Alphabet:
             "delimiter": self.delimiter,
             "name": self.name,
             "description": self.description,
+            "gap_character": self.gap_character,
         }
 
     def to_json(self, path: Union[str, Path]) -> None:
@@ -187,60 +225,70 @@ class Alphabet:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
-    def protein(cls) -> "Alphabet":
+    def protein(cls, gap_character: str = "-") -> "Alphabet":
         """Create a standard protein alphabet.
 
+        :param gap_character: Character to use for padding (default: "-")
         :return: Alphabet for standard amino acids
         """
         return cls(
-            tokens="ACDEFGHIKLMNPQRSTVWY",
+            tokens="ACDEFGHIKLMNPQRSTVWY" + gap_character,
             name="protein",
-            description="Standard 20 amino acids",
+            description="Standard 20 amino acids with gap character",
+            gap_character=gap_character,
         )
 
     @classmethod
-    def dna(cls) -> "Alphabet":
+    def dna(cls, gap_character: str = "-") -> "Alphabet":
         """Create a standard DNA alphabet.
 
+        :param gap_character: Character to use for padding (default: "-")
         :return: Alphabet for DNA
         """
         return cls(
-            tokens="ACGT",
+            tokens="ACGT" + gap_character,
             name="dna",
-            description="Standard DNA nucleotides",
+            description="Standard DNA nucleotides with gap character",
+            gap_character=gap_character,
         )
 
     @classmethod
-    def rna(cls) -> "Alphabet":
+    def rna(cls, gap_character: str = "-") -> "Alphabet":
         """Create a standard RNA alphabet.
 
+        :param gap_character: Character to use for padding (default: "-")
         :return: Alphabet for RNA
         """
         return cls(
-            tokens="ACGU",
+            tokens="ACGU" + gap_character,
             name="rna",
-            description="Standard RNA nucleotides",
+            description="Standard RNA nucleotides with gap character",
+            gap_character=gap_character,
         )
 
     @classmethod
-    def integer(cls, max_value: int) -> "Alphabet":
+    def integer(cls, max_value: int, gap_value: str = "-1", gap_character: str = "-") -> "Alphabet":
         """Create an integer-based alphabet (0 to max_value).
 
         :param max_value: Maximum integer value (inclusive)
+        :param gap_value: String representation of the gap value (default: "-1")
+        :param gap_character: Character to use for padding in string representation (default: "-")
         :return: Alphabet with integer tokens
         """
         return cls(
-            tokens=[str(i) for i in range(max_value + 1)],
+            tokens=[str(i) for i in range(max_value + 1)] + [gap_value],
             name=f"integer-0-{max_value}",
-            description=f"Integer values from 0 to {max_value}",
+            description=f"Integer values from 0 to {max_value} with gap value {gap_value}",
             delimiter=",",
+            gap_character=gap_character,
         )
 
     @classmethod
-    def auto_detect(cls, sequences: List[str]) -> "Alphabet":
+    def auto_detect(cls, sequences: List[str], gap_character: str = "-") -> "Alphabet":
         """Automatically detect alphabet from sequences.
 
         :param sequences: List of example sequences
+        :param gap_character: Character to use for padding (default: "-")
         :return: Inferred alphabet
         """
         # Sample for efficiency
@@ -255,16 +303,16 @@ class Alphabet:
 
         # Make decision based on counts
         if u_count > 0 and t_count == 0:
-            return cls.rna()
+            return cls.rna(gap_character=gap_character)
         elif protein_count > 0:
-            return cls.protein()
+            return cls.protein(gap_character=gap_character)
         else:
-            return cls.dna()
+            return cls.dna(gap_character=gap_character)
 ```
 
 ### 2. Updated OneHotEmbedder
 
-Modify the `OneHotEmbedder` class to work with the new `Alphabet` class:
+Modify the `OneHotEmbedder` class to work with the new `Alphabet` class and handle padding for sequences of different lengths:
 
 ```python
 class OneHotEmbedder:
@@ -272,21 +320,28 @@ class OneHotEmbedder:
 
     :param alphabet: Alphabet to use for encoding (or predefined type)
     :param max_length: Maximum sequence length (will pad/truncate to this length)
+    :param pad_sequences: Whether to pad sequences of different lengths
+    :param gap_character: Character to use for padding (default: "-")
     """
 
     def __init__(
         self,
         alphabet: Union[Alphabet, Literal["protein", "dna", "rna", "auto"]] = "auto",
         max_length: Optional[int] = None,
+        pad_sequences: bool = True,
+        gap_character: str = "-",
     ):
+        self.pad_sequences = pad_sequences
+        self.gap_character = gap_character
+
         if isinstance(alphabet, Alphabet):
             self.alphabet = alphabet
         elif alphabet == "protein":
-            self.alphabet = Alphabet.protein()
+            self.alphabet = Alphabet.protein(gap_character=gap_character)
         elif alphabet == "dna":
-            self.alphabet = Alphabet.dna()
+            self.alphabet = Alphabet.dna(gap_character=gap_character)
         elif alphabet == "rna":
-            self.alphabet = Alphabet.rna()
+            self.alphabet = Alphabet.rna(gap_character=gap_character)
         elif alphabet == "auto":
             self.alphabet = None  # Will be set during fit
         else:
@@ -305,16 +360,21 @@ class OneHotEmbedder:
 
         # Auto-detect alphabet if needed
         if self.alphabet is None:
-            self.alphabet = Alphabet.auto_detect(sequences)
+            self.alphabet = Alphabet.auto_detect(
+                sequences, gap_character=self.gap_character
+            )
 
-        # Determine max_length if not specified
-        if self.max_length is None:
+        # Determine max_length if not specified but padding is enabled
+        if self.max_length is None and self.pad_sequences:
             self.max_length = max(len(self.alphabet.tokenize(seq)) for seq in sequences)
 
         return self
 
     def transform(self, sequences: Union[List[str], pd.Series]) -> np.ndarray:
         """Transform sequences to one-hot encodings.
+
+        If sequences are of different lengths and pad_sequences=True, they
+        will be padded to max_length with the gap character.
 
         :param sequences: List or Series of sequences to embed
         :return: Array of one-hot encodings
@@ -324,6 +384,21 @@ class OneHotEmbedder:
 
         if self.alphabet is None:
             raise ValueError("Embedder has not been fit yet. Call fit() first.")
+
+        # Preprocess sequences if padding is enabled
+        if self.pad_sequences and self.max_length is not None:
+            preprocessed = []
+            for seq in sequences:
+                tokens = self.alphabet.tokenize(seq)
+                if len(tokens) > self.max_length:
+                    # Truncate
+                    tokens = tokens[:self.max_length]
+                elif len(tokens) < self.max_length:
+                    # Pad with gap character
+                    tokens += [self.alphabet.gap_character] * (self.max_length - len(tokens))
+
+                preprocessed.append(self.alphabet.tokens_to_sequence(tokens))
+            sequences = preprocessed
 
         # Encode each sequence
         embeddings = []
@@ -342,10 +417,6 @@ class OneHotEmbedder:
         # Tokenize the sequence
         tokens = self.alphabet.tokenize(sequence)
 
-        # Limit to max_length if needed
-        if self.max_length is not None:
-            tokens = tokens[:self.max_length]
-
         # Create matrix of zeros (tokens × alphabet size)
         encoding = np.zeros((len(tokens), self.alphabet.size))
 
@@ -354,11 +425,11 @@ class OneHotEmbedder:
             idx = self.alphabet.token_to_idx.get(token, -1)
             if idx >= 0:
                 encoding[i, idx] = 1
-
-        # Pad if needed
-        if self.max_length is not None and len(tokens) < self.max_length:
-            padding = np.zeros((self.max_length - len(tokens), self.alphabet.size))
-            encoding = np.vstack([encoding, padding])
+            elif token == self.alphabet.gap_character:
+                # Special handling for gap character
+                gap_idx = self.alphabet.token_to_idx.get(self.alphabet.gap_character, -1)
+                if gap_idx >= 0:
+                    encoding[i, gap_idx] = 1
 
         # Flatten to a vector
         return encoding.flatten()
@@ -366,14 +437,15 @@ class OneHotEmbedder:
 
 ### 3. Configuration File Format
 
-Define a standard JSON format for alphabet configuration files:
+Extend the standard JSON format for alphabet configuration files to include gap character:
 
 ```json
 {
   "name": "modified_amino_acids",
   "description": "Amino acids with chemical modifications",
-  "tokens": ["A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "Y", "pS", "pT", "pY", "me3K"],
-  "delimiter": null
+  "tokens": ["A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "Y", "pS", "pT", "pY", "me3K", "-"],
+  "delimiter": null,
+  "gap_character": "-"
 }
 ```
 
@@ -383,52 +455,70 @@ For integer-based representations:
 {
   "name": "amino_acid_indices",
   "description": "Numbered amino acids (0-25) with comma delimiter",
-  "tokens": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25"],
-  "delimiter": ","
+  "tokens": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "-1"],
+  "delimiter": ",",
+  "gap_character": "-",
+  "gap_value": "-1"
 }
 ```
 
 ### 4. Inferred Alphabets
 
-Implement functionality to automatically infer alphabets from sequences:
+Update the alphabet inference to include gap characters:
 
 ```python
-def infer_alphabet(sequences: List[str], delimiter: Optional[str] = None) -> Alphabet:
+def infer_alphabet(
+    sequences: List[str],
+    delimiter: Optional[str] = None,
+    gap_character: str = "-"
+) -> Alphabet:
     """Infer an alphabet from a list of sequences.
 
     :param sequences: List of sequences to analyze
     :param delimiter: Optional delimiter used in sequences
+    :param gap_character: Character to use for padding
     :return: Inferred Alphabet
     """
     all_tokens = set()
 
     # Create a temporary alphabet just for tokenization
+    temp_tokens = set("".join(sequences)) if delimiter is None else set()
+    temp_tokens.add(gap_character)
+
     temp_alphabet = Alphabet(
-        tokens=set("".join(sequences)) if delimiter is None else set(),
-        delimiter=delimiter
+        tokens=temp_tokens,
+        delimiter=delimiter,
+        gap_character=gap_character
     )
 
     # Extract all tokens from sequences
     for seq in sequences:
         all_tokens.update(temp_alphabet.tokenize(seq))
 
+    # Ensure gap character is included
+    all_tokens.add(gap_character)
+
     # Create final alphabet with the discovered tokens
     return Alphabet(
         tokens=all_tokens,
         delimiter=delimiter,
         name="inferred",
-        description=f"Alphabet inferred from {len(sequences)} sequences"
+        description=f"Alphabet inferred from {len(sequences)} sequences",
+        gap_character=gap_character
     )
 ```
 
 ### 5. Integration with Existing Code
 
-1. Update the `get_embedder` function to support custom alphabets:
+1. Update the `get_embedder` function to support custom alphabets and padding:
 
 ```python
 def get_embedder(
     method: str = "one-hot",
     alphabet: Union[str, Path, Alphabet, List[str], Dict] = "auto",
+    max_length: Optional[int] = None,
+    pad_sequences: bool = True,
+    gap_character: str = "-",
     **kwargs
 ) -> OneHotEmbedder:
     """Get an embedder instance based on method name.
@@ -440,6 +530,9 @@ def get_embedder(
                      - Alphabet instance
                      - List of tokens to create a new alphabet
                      - Dictionary with alphabet configuration
+    :param max_length: Maximum sequence length (for padding/truncation)
+    :param pad_sequences: Whether to pad sequences to the same length
+    :param gap_character: Character to use for padding
     :return: Configured embedder
     """
     if method != "one-hot":
@@ -453,16 +546,24 @@ def get_embedder(
         alphabet = Alphabet.from_json(alphabet)
     elif isinstance(alphabet, list):
         # Create from token list
-        alphabet = Alphabet(tokens=alphabet)
+        alphabet = Alphabet(tokens=alphabet, gap_character=gap_character)
     elif isinstance(alphabet, dict):
         # Create from config dictionary
+        if "gap_character" not in alphabet:
+            alphabet["gap_character"] = gap_character
         alphabet = Alphabet.from_config(alphabet)
 
     # Pass to embedder
-    return OneHotEmbedder(alphabet=alphabet, **kwargs)
+    return OneHotEmbedder(
+        alphabet=alphabet,
+        max_length=max_length,
+        pad_sequences=pad_sequences,
+        gap_character=gap_character,
+        **kwargs
+    )
 ```
 
-2. Update the training workflow to handle custom alphabets:
+2. Update the training workflow to handle custom alphabets and padding:
 
 ```python
 def train_model(
@@ -473,121 +574,136 @@ def train_model(
     target_col="function",
     embedding_method="one-hot",
     alphabet="auto",
+    max_length=None,
+    pad_sequences=True,
+    gap_character="-",
     model_type="regression",
     optimization_metric=None,
     **kwargs
 ):
     # Create or load the alphabet
     if alphabet != "auto" and not isinstance(alphabet, Alphabet):
-        alphabet = get_alphabet(alphabet)  # Utility function to resolve alphabets
+        alphabet = get_alphabet(alphabet, gap_character=gap_character)
 
     # Get the appropriate embedder
-    embedder = get_embedder(method=embedding_method, alphabet=alphabet)
+    embedder = get_embedder(
+        method=embedding_method,
+        alphabet=alphabet,
+        max_length=max_length,
+        pad_sequences=pad_sequences,
+        gap_character=gap_character
+    )
 
     # Rest of the training logic...
 ```
 
+## Sequence Padding Implementation
+
+A key enhancement in this design is the automatic handling of sequences with different lengths. The implementation:
+
+1. Automatically detects the maximum sequence length during fitting (unless explicitly specified)
+2. Pads shorter sequences to the maximum length using a configurable gap character (default: "-")
+3. Truncates longer sequences to the maximum length if necessary
+4. Ensures the gap character is included in all alphabets for consistent encoding
+5. Allows disabling padding via the `pad_sequences` parameter
+
+This approach provides several advantages:
+
+1. **Simplified Model Training**: All sequences are encoded to the same dimensionality, which is required by most machine learning models
+2. **Configurable Gap Character**: Different domains may use different symbols for gaps/padding
+3. **Padding Awareness**: The embedder is aware of padding, ensuring proper handling during encoding and decoding
+4. **Integration with Custom Alphabets**: The padding system works seamlessly with all alphabet types
+
 ## Examples of Supported Use Cases
 
-### 1. Standard Sequences
+### 1. Sequences with Different Lengths
 
 ```python
-# Standard protein sequences
-protein_alphabet = Alphabet.protein()
-sequences = ["ACDE", "KLMNP", "QRSTV"]
-embedder = OneHotEmbedder(alphabet=protein_alphabet)
+# Sequences of different lengths
+sequences = ["ACDE", "KLMNPQR", "ST"]
+embedder = OneHotEmbedder(alphabet="protein", pad_sequences=True)
 embeddings = embedder.fit_transform(sequences)
+# Sequences are padded to length 7: "ACDE---", "KLMNPQR", "ST-----"
 ```
 
-### 2. Chemically Modified Amino Acids
+### 2. Custom Gap Character
 
 ```python
-# Amino acids with modifications (phosphorylation, methylation)
-aa_tokens = list("ACDEFGHIKLMNPQRSTVWY") + ["pS", "pT", "pY", "me3K"]
-mod_aa_alphabet = Alphabet(tokens=aa_tokens, name="modified_aa")
-
-# Example sequences with modified AAs
-sequences = ["ACDEpS", "KLMme3KNP", "QRSTpYV"]
-embedder = OneHotEmbedder(alphabet=mod_aa_alphabet)
+# Using a custom gap character "X"
+sequences = ["ACDE", "KLMNP", "QR"]
+embedder = OneHotEmbedder(alphabet="protein", pad_sequences=True, gap_character="X")
 embeddings = embedder.fit_transform(sequences)
+# Sequences are padded to length 5: "ACDEXX", "KLMNP", "QRXXX"
 ```
 
-### 3. Integer-Based Representation
+### 3. Chemically Modified Amino Acids with Padding
 
 ```python
-# Integer representation with comma delimiter
-int_alphabet = Alphabet(
-    tokens=[str(i) for i in range(30)],
-    delimiter=",",
-    name="integer_aa"
+# Amino acids with modifications and variable lengths
+aa_tokens = list("ACDEFGHIKLMNPQRSTVWY") + ["pS", "pT", "pY", "me3K", "X"]
+mod_aa_alphabet = Alphabet(
+    tokens=aa_tokens,
+    name="modified_aa",
+    gap_character="X"
 )
 
-# Example sequences as comma-separated integers
-sequences = ["0,1,2,3,20", "10,11,12,25,14", "15,16,17,18,19,21"]
-embedder = OneHotEmbedder(alphabet=int_alphabet)
+# Example sequences with modified AAs of different lengths
+sequences = ["ACDEpS", "KLMme3KNP", "QR"]
+embedder = OneHotEmbedder(alphabet=mod_aa_alphabet, pad_sequences=True)
 embeddings = embedder.fit_transform(sequences)
+# Sequences are padded: "ACDEpSXX", "KLMme3KNP", "QRXXXXXX"
 ```
 
-### 4. Custom Alphabet from Configuration
+### 4. Integer-Based Representation with Custom Gap Value
 
 ```python
-# Load a custom alphabet from a JSON file
-alphabet = Alphabet.from_json("path/to/custom_alphabet.json")
-embedder = OneHotEmbedder(alphabet=alphabet)
-```
+# Integer representation with comma delimiter and -1 as gap
+int_alphabet = Alphabet(
+    tokens=[str(i) for i in range(30)] + ["-1"],
+    delimiter=",",
+    name="integer_aa",
+    gap_character="-",  # Character for string representation
+    gap_value="-1"      # Value used in encoded form
+)
 
-### 5. Automatically Inferred Alphabet
-
-```python
-# Infer alphabet from sequences
-sequences = ["ADHpK", "VWme3K", "EFGHpY"]
-alphabet = infer_alphabet(sequences)
-print(f"Inferred alphabet with {alphabet.size} tokens: {alphabet.tokens}")
-
-# Use the inferred alphabet for encoding
-embedder = OneHotEmbedder(alphabet=alphabet)
+# Example sequences as comma-separated integers of different lengths
+sequences = ["0,1,2", "10,11,12,25,14", "15,16"]
+embedder = OneHotEmbedder(alphabet=int_alphabet, pad_sequences=True)
 embeddings = embedder.fit_transform(sequences)
+# Padded with gap values: "0,1,2,-1,-1", "10,11,12,25,14", "15,16,-1,-1,-1"
 ```
 
 ## Implementation Considerations
 
 1. **Backwards Compatibility**: The design maintains compatibility with existing code by:
-   - Keeping the same function signatures
-   - Providing default alphabets that match current behavior
-   - Allowing "auto" detection as currently implemented
+   - Making padding behavior configurable but enabled by default
+   - Providing the same function signatures with additional optional parameters
+   - Using a standard gap character ("-") that's common in bioinformatics
 
-2. **Performance**: For optimal performance:
-   - Pre-compiled regex patterns for tokenization
-   - Caching of tokenized sequences
-   - Efficient lookups using dictionaries
+2. **Performance**: For optimal performance with padding:
+   - Precompute max length during fit to avoid recomputing for each transform
+   - Use vectorized operations for padding where possible
+   - Cache tokenized and padded sequences when appropriate
 
-3. **Extensibility**: The design allows for future extensions:
-   - Support for embeddings beyond one-hot
-   - Integration with custom tokenizers
-   - Support for sequence generation/decoding
-
-4. **Validation**: The design includes validation capabilities:
-   - Checking if sequences can be tokenized with an alphabet
-   - Reporting invalid or unknown tokens
-   - Validating alphabet configurations
+3. **Extensibility**: The padding system is designed for future extensions:
+   - Support for different padding strategies (pre-padding vs. post-padding)
+   - Integration with alignment-aware embeddings
+   - Support for variable-length sequence models
 
 ## Testing Strategy
 
-1. Unit tests for the `Alphabet` class:
-   - Testing all constructors and factory methods
-   - Testing tokenization with various delimiters
-   - Testing serialization/deserialization
+Additional tests should be added to validate the padding functionality:
 
-2. Unit tests for the updated `OneHotEmbedder`:
-   - Ensuring it works with all alphabet types
-   - Testing padding and truncation
-   - Testing encoding/decoding roundtrip
+1. Tests for the `Alphabet` class:
+   - Test padding sequences to a specified length
+   - Test inclusion of gap characters in the token set
+   - Test tokenization with gap characters
 
-3. Integration tests:
-   - End-to-end workflow with custom alphabets
-   - Performance benchmarks for large alphabets
-   - Compatibility with existing model code
+2. Tests for the updated `OneHotEmbedder`:
+   - Test handling of sequences with different lengths
+   - Test padding with different gap characters
+   - Test disable/enable padding functionality
 
 ## Conclusion
 
-This design provides a flexible, maintainable solution for handling custom alphabets in fast-seqfunc, supporting a wide range of sequence representations while maintaining the simplicity of the original code. The `Alphabet` class encapsulates all the complexity of tokenization and mapping, while the embedding system remains clean and focused on its primary task of feature generation.
+This design provides a flexible, maintainable solution for handling custom alphabets and sequences of different lengths in `fast-seqfunc`. The inclusion of automatic padding with configurable gap characters makes the library more robust and user-friendly, particularly for cases where sequences have naturally variable lengths. The `Alphabet` class encapsulates all the complexity of tokenization, mapping, and padding, while the embedding system remains clean and focused on its primary task of feature generation.

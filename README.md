@@ -20,6 +20,11 @@ Fast-SeqFunc is a Python package designed for efficient sequence-function modeli
   - Supports regression and classification tasks
   - Evaluates performance with appropriate metrics
 
+- **Sequence Handling**:
+  - Flexible handling of variable-length sequences
+  - Configurable padding options for consistent embeddings
+  - Custom alphabets support
+
 - **Simple API**:
   - Single function call to train models
   - Handles data loading and preprocessing
@@ -129,6 +134,35 @@ predictions, confidence = predict(
     return_confidence=True
 )
 ```
+
+### Handling Variable Length Sequences
+
+Fast-SeqFunc handles variable length sequences with configurable padding:
+
+```python
+# Default behavior pads all sequences to the max length with "-"
+model = train_model(
+    train_data=train_data,
+    embedding_method="one-hot",
+    embedder_kwargs={"pad_sequences": True, "gap_character": "-"}
+)
+
+# Disable padding for sequences of different lengths
+model = train_model(
+    train_data=train_data,
+    embedding_method="one-hot",
+    embedder_kwargs={"pad_sequences": False}
+)
+
+# Set a fixed maximum length and custom gap character
+model = train_model(
+    train_data=train_data,
+    embedding_method="one-hot",
+    embedder_kwargs={"max_length": 100, "gap_character": "X"}
+)
+```
+
+For a complete example, see `examples/variable_length_sequences.py`.
 
 ## Documentation
 
