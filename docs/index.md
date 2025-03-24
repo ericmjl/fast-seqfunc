@@ -1,78 +1,65 @@
-# Fast-SeqFunc
+# Fast-SeqFunc Documentation
 
-Welcome to Fast-SeqFunc, a Python package designed for efficient sequence-function modeling of proteins and nucleotides.
+`fast-seqfunc` is a Python library for building sequence-function models quickly and easily, leveraging PyCaret and machine learning techniques to predict functional properties from biological sequences.
 
-## Overview
+## Getting Started
 
-Fast-SeqFunc provides a simple, high-level API that handles various sequence embedding methods and automates model selection and training through the PyCaret framework.
+- [Quickstart Tutorial](quickstart.md) - Learn the basics of training and using sequence-function models
+- [Classification Tutorial](classification_tutorial.md) - Learn how to classify sequences into discrete categories
 
-* [Design Document](design.md): Learn about the architecture and design principles
-* [API Documentation](api.md): Explore the package API
+## Installation
 
-## Quickstart
-
-### Install from PyPI
+Install `fast-seqfunc` using pip:
 
 ```bash
 pip install fast-seqfunc
 ```
 
-### Install from source
+Or directly from GitHub for the latest version:
 
 ```bash
-git clone git@github.com:ericmjl/fast-seqfunc.git
-cd fast-seqfunc
-pip install -e .
+pip install git+https://github.com/ericmjl/fast-seqfunc.git
 ```
 
-### Basic Usage
+## Key Features
+
+- **Easy-to-use API**: Train models and make predictions with just a few lines of code
+- **Automatic Model Selection**: Uses PyCaret to automatically compare and select the best model
+- **Sequence Embedding**: Currently supports one-hot encoding with more methods coming soon
+- **Regression and Classification**: Support for both continuous values and categorical outputs
+- **Comprehensive Evaluation**: Built-in metrics and visualization utilities
+
+## Basic Usage
 
 ```python
-from fast_seqfunc import train_model, predict
-import pandas as pd
-
-# Load your sequence-function data
-train_data = pd.read_csv("train_data.csv")
-val_data = pd.read_csv("val_data.csv")
+from fast_seqfunc import train_model, predict, save_model
 
 # Train a model
-model = train_model(
-    train_data=train_data,
-    val_data=val_data,
+model_info = train_model(
+    train_data=train_df,
     sequence_col="sequence",
     target_col="function",
-    embedding_method="one-hot",  # or "carp", "esm2", "auto"
-    model_type="regression",     # or "classification"
+    embedding_method="one-hot",
+    model_type="regression"
 )
 
-# Make predictions on new sequences
-new_data = pd.read_csv("new_sequences.csv")
-predictions = predict(model, new_data["sequence"])
+# Make predictions
+predictions = predict(model_info, new_sequences)
 
-# Save the model for later use
-model.save("my_model.pkl")
+# Save the model
+save_model(model_info, "model.pkl")
 ```
 
-### Command-line Interface
+## Roadmap
 
-Train a model:
+Future development plans include:
 
-```bash
-fast-seqfunc train train_data.csv --sequence-col sequence --target-col function
-```
+1. Additional embedding methods (ESM, CARP, etc.)
+2. Integration with more advanced deep learning models
+3. Enhanced visualization and interpretation tools
+4. Expanded support for various sequence types
+5. Benchmarking against established methods
 
-Make predictions:
+## Contributing
 
-```bash
-fast-seqfunc predict-cmd model.pkl new_sequences.csv --output-path predictions.csv
-```
-
-## Documentation
-
-For full documentation, see the [design document](design.md) and [API reference](api.md).
-
-## Why this project exists
-
-Fast-SeqFunc was created to simplify the process of sequence-function modeling for proteins and nucleotide sequences. It eliminates the need for users to implement their own embedding methods or model selection processes, allowing them to focus on their research questions.
-
-By integrating state-of-the-art embedding methods like CARP and ESM2 with automated machine learning from PyCaret, Fast-SeqFunc makes advanced ML techniques accessible to researchers without requiring deep ML expertise.
+Contributions are welcome! Please feel free to submit a Pull Request or open an issue to discuss improvements or feature requests.
