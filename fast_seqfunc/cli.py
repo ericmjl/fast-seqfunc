@@ -14,7 +14,7 @@ import pandas as pd
 import typer
 from loguru import logger
 
-from fast_seqfunc.core import load_model, predict, train_model
+from fast_seqfunc.core import load_model, predict, save_model, train_model
 
 app = typer.Typer()
 
@@ -61,7 +61,7 @@ def train(
     )
 
     # Save the trained model
-    model.save(output_path)
+    save_model(model, output_path)
     logger.info(f"Model saved to {output_path}")
 
 
