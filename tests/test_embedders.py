@@ -1,8 +1,5 @@
 """Tests for the embedders module."""
 
-import tempfile
-from pathlib import Path
-
 import numpy as np
 import pytest
 
@@ -20,25 +17,12 @@ class TestOneHotEmbedder:
         # Default initialization
         embedder = OneHotEmbedder()
         assert embedder.sequence_type == "auto"
-        assert embedder.max_length is None
-        assert embedder.padding == "post"
-        assert embedder.truncating == "post"
-        assert embedder.cache_dir is None
+        assert embedder.alphabet is None
+        assert embedder.alphabet_size is None
 
         # Custom parameters
-        cache_dir = tempfile.mkdtemp()
-        embedder = OneHotEmbedder(
-            sequence_type="protein",
-            max_length=10,
-            padding="pre",
-            truncating="pre",
-            cache_dir=cache_dir,
-        )
+        embedder = OneHotEmbedder(sequence_type="protein")
         assert embedder.sequence_type == "protein"
-        assert embedder.max_length == 10
-        assert embedder.padding == "pre"
-        assert embedder.truncating == "pre"
-        assert embedder.cache_dir == Path(cache_dir)
 
     def test_fit(self):
         """Test fitting to sequences."""
@@ -49,7 +33,7 @@ class TestOneHotEmbedder:
         embedder.fit(protein_seqs)
         assert embedder.sequence_type == "protein"
         assert embedder.alphabet == "ACDEFGHIKLMNPQRSTVWY"
-        assert embedder.max_length == 8  # Length of longest sequence
+        assert embedder.alphabet_size == 20
 
         # DNA sequences
         dna_seqs = ["ACGT", "TGCA", "AATT"]
@@ -57,21 +41,23 @@ class TestOneHotEmbedder:
         embedder.fit(dna_seqs)
         assert embedder.sequence_type == "dna"
         assert embedder.alphabet == "ACGT"
+        assert embedder.alphabet_size == 4
 
         # Explicit sequence type
         embedder = OneHotEmbedder(sequence_type="rna")
         embedder.fit(["ACGU", "UGCA"])
         assert embedder.sequence_type == "rna"
         assert embedder.alphabet == "ACGU"
+        assert embedder.alphabet_size == 4
 
-    def test_embed_sequence(self):
-        """Test embedding a single sequence."""
+    def test_one_hot_encode(self):
+        """Test one-hot encoding a single sequence."""
         # DNA sequence
         embedder = OneHotEmbedder(sequence_type="dna")
         embedder.fit(["ACGT"])
 
         # "ACGT" with 4 letters in alphabet = 4x4 matrix (flattened to 16 values)
-        embedding = embedder._embed_sequence("ACGT")
+        embedding = embedder._one_hot_encode("ACGT")
         assert embedding.shape == (16,)  # 4 positions * 4 letters
 
         # One-hot encoding should have exactly one 1 per position
@@ -89,13 +75,13 @@ class TestOneHotEmbedder:
 
     def test_transform(self):
         """Test transforming multiple sequences."""
-        embedder = OneHotEmbedder(sequence_type="protein", max_length=5)
+        embedder = OneHotEmbedder(sequence_type="protein")
         embedder.fit(["ACDEF", "GHIKL"])
 
         # Transform multiple sequences
         embeddings = embedder.transform(["ACDEF", "GHIKL"])
 
-        # With alphabet of 20 amino acids and max_length 5, each embedding should be 100
+        # With alphabet of 20 amino acids and length 5, each embedding should be 100
         assert embeddings.shape == (2, 100)  # 2 sequences, 5 positions * 20 amino acids
 
     def test_fit_transform(self):
@@ -113,36 +99,12 @@ class TestOneHotEmbedder:
         # Should have transformed
         assert embeddings.shape == (2, 16)  # 2 sequences, 4 positions * 4 nucleotides
 
-    def test_padding_truncating(self):
-        """Test padding and truncating behavior."""
-        # Test padding
-        embedder = OneHotEmbedder(sequence_type="dna", max_length=5)
-        embedder.fit(["ACGT"])
-
-        # Pad shorter sequence
-        embedding = embedder._embed_sequence("AC")
-        assert embedding.shape == (20,)  # 5 positions * 4 nucleotides
-
-        # Test truncating
-        embedder = OneHotEmbedder(sequence_type="dna", max_length=2)
-        embedder.fit(["ACGT"])
-
-        # Truncate longer sequence
-        embedding = embedder._embed_sequence("ACGT")
-        assert embedding.shape == (8,)  # 2 positions * 4 nucleotides
-
 
 def test_get_embedder():
     """Test the embedder factory function."""
     # Get one-hot embedder
     embedder = get_embedder("one-hot")
     assert isinstance(embedder, OneHotEmbedder)
-
-    # Get one-hot embedder with parameters
-    embedder = get_embedder("one-hot", sequence_type="protein", max_length=10)
-    assert isinstance(embedder, OneHotEmbedder)
-    assert embedder.sequence_type == "protein"
-    assert embedder.max_length == 10
 
     # Test invalid method
     with pytest.raises(ValueError):
