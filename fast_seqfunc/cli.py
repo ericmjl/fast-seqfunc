@@ -38,7 +38,7 @@ def train(
         "one-hot", help="Embedding method: one-hot, carp, esm2, or auto"
     ),
     model_type: str = typer.Option(
-        "regression", help="Model type: regression, classification, or multi-class"
+        "regression", help="Model type: regression or classification"
     ),
     output_path: Path = typer.Option(
         Path("model.pkl"), help="Path to save trained model"
@@ -146,7 +146,7 @@ def compare_embeddings(
         None, help="Optional path to test data for final evaluation"
     ),
     model_type: str = typer.Option(
-        "regression", help="Model type: regression, classification, or multi-class"
+        "regression", help="Model type: regression or classification"
     ),
     output_path: Path = typer.Option(
         Path("embedding_comparison.csv"), help="Path to save comparison results"
