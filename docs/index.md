@@ -5,7 +5,8 @@
 ## Getting Started
 
 - [Quickstart Tutorial](quickstart.md) - Learn the basics of training and using sequence-function models
-- [Classification Tutorial](classification_tutorial.md) - Learn how to classify sequences into discrete categories
+- [Regression Tutorial](tutorials/regression_tutorial.md) - Learn how to predict continuous values from sequences
+- [Classification Tutorial](tutorials/classification_tutorial.md) - Learn how to classify sequences into discrete categories
 
 ## Installation
 
