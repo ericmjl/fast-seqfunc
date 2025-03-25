@@ -342,6 +342,29 @@ def generate_synthetic(
     if task != "length_dependent":
         task_params["length"] = sequence_length
 
+    # We need to patch the generate_random_sequences function to use our alphabet
+    # This approach uses monkey patching to avoid having to modify all task functions
+    original_generate_random_sequences = synthetic.generate_random_sequences
+
+    def patched_generate_random_sequences(*args, **kwargs):
+        """
+        Patched version of `generate_random_sequences` that uses a custom alphabet.
+
+        This function overrides the alphabet parameter with our custom alphabet while
+        preserving all other parameters passed to the original function.
+
+        :param args: Positional arguments to pass to the original function
+        :param kwargs: Keyword arguments to pass to the original function
+        :return: Result from the original generate_random_sequences function
+        """
+        # Override the alphabet parameter with our custom alphabet,
+        # but keep other parameters
+        kwargs["alphabet"] = alphabet
+        return original_generate_random_sequences(*args, **kwargs)
+
+    # Replace the function temporarily
+    synthetic.generate_random_sequences = patched_generate_random_sequences
+
     # Add task-specific parameters based on the task type
     if task == "motif_position":
         # Use custom motif if provided
@@ -395,9 +418,6 @@ def generate_synthetic(
         task_params["min_length"] = min_length
         task_params["max_length"] = max_length
 
-    # Add alphabet parameter to all tasks
-    task_params["alphabet"] = alphabet
-
     # Validate the task
     valid_tasks = [
         "g_count",
@@ -417,6 +437,11 @@ def generate_synthetic(
         )
         raise typer.Exit(1)
 
+    # The task functions don't directly accept an alphabet parameter
+    # so we need to remove it from task_params
+    if "alphabet" in task_params:
+        del task_params["alphabet"]
+
     # Generate the dataset
     try:
         df = synthetic.generate_dataset_by_task(
@@ -433,6 +458,8 @@ def generate_synthetic(
             output_path = output_dir / f"{file_prefix}{task}_data.csv"
             df.to_csv(output_path, index=False)
             logger.info(f"Saved full dataset to {output_path}")
+            # Restore original function
+            synthetic.generate_random_sequences = original_generate_random_sequences
             return
 
         # Validate split ratios
@@ -489,6 +516,9 @@ def generate_synthetic(
     except Exception as e:
         logger.error(f"Error generating synthetic data: {e}")
         raise typer.Exit(1)
+    finally:
+        # Make sure to restore the original function even if an error occurs
+        synthetic.generate_random_sequences = original_generate_random_sequences
 
 
 @app.command()
