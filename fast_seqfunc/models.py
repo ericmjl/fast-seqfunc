@@ -2,7 +2,7 @@
 
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import lazy_loader as lazy
 from loguru import logger
@@ -254,21 +254,6 @@ class SequenceFunctionModel:
                 raise RuntimeError(
                     f"Failed to generate predictions with PyCaret: {str(e)}"
                 ) from e
-
-    def predict_with_confidence(
-        self,
-        sequences: Union[List[str], pd.Series],
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """Generate predictions with confidence estimates.
-
-        :param sequences: Sequences to predict
-        :return: Tuple of (predictions, confidence)
-        """
-        # For now, return placeholders
-        predictions = self.predict(sequences)
-        confidence = np.ones_like(predictions) * 0.95  # Placeholder confidence
-
-        return predictions, confidence
 
     def evaluate(
         self,

@@ -6,7 +6,7 @@ and making predictions with a simpler design using PyCaret directly.
 
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -177,16 +177,13 @@ def predict(
     model_info: Dict[str, Any],
     sequences: Union[List[str], pd.DataFrame, pd.Series],
     sequence_col: str = "sequence",
-    return_confidence: bool = False,
-) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+) -> np.ndarray:
     """Generate predictions for new sequences using a trained model.
 
     :param model_info: Dictionary containing model and related information
     :param sequences: Sequences to predict (list, Series, or DataFrame)
     :param sequence_col: Column name in DataFrame containing sequences
-    :param return_confidence: Whether to return confidence estimates
-    :return: Array of predictions or tuple of (predictions, confidence)
-        if return_confidence=True
+    :return: Array of predictions
     """
     # Extract sequences if a DataFrame is provided
     if isinstance(sequences, pd.DataFrame):
@@ -228,14 +225,6 @@ def predict(
                 f"Cannot identify prediction column. Columns: {predictions.columns}"
             )
             raise ValueError("Unable to identify prediction column in output")
-
-        # If confidence is requested, generate a dummy confidence score
-        # This is a placeholder - in a real implementation, you'd want to
-        # derive this from the model's uncertainty estimates
-        if return_confidence:
-            # Generate dummy confidence values (0.8-1.0 range)
-            confidence = np.random.uniform(0.8, 1.0, len(sequences))
-            return predictions[pred_cols[0]].values, confidence
 
         return predictions[pred_cols[0]].values
 
