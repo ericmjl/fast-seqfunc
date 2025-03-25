@@ -152,3 +152,5 @@ docs/cli.md
 message_log.db
 catboost_info/*
 examples/output/*
+*.pkl
+data/
