@@ -4231,7 +4231,7 @@ packages:
 - pypi: .
   name: fast-seqfunc
   version: 0.0.1
-  sha256: 5f4381100217acd4f24543a549131a2c712bc5abe3f102d12f4c41b613af363e
+  sha256: a81fcfb97776195392fce9c861d33fae9f70f0008b80933ed79c157079071244
   requires_dist:
   - typer>=0.9.0
   - numpy>=1.22.0
