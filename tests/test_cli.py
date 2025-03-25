@@ -212,7 +212,7 @@ def test_cli_multiclass(multiclass_data, temp_dir):
             "--embedding-method",
             "one-hot",
             "--model-type",
-            "multi-class",
+            "classification",
             "--output-path",
             str(model_path),
         ],
