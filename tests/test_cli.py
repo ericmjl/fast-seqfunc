@@ -245,43 +245,6 @@ def test_cli_multiclass(multiclass_data, temp_dir):
     assert "prediction" in predictions_df.columns
 
 
-def test_cli_with_confidence(g_count_data, temp_dir):
-    """Test CLI with confidence estimation."""
-    runner = CliRunner()
-    model_path = Path(temp_dir) / "model_confidence.pkl"
-
-    # Train model
-    result = runner.invoke(
-        app, ["train", str(g_count_data), "--output-path", str(model_path)]
-    )
-
-    assert result.exit_code == 0
-    assert model_path.exists()
-
-    # Make predictions with confidence
-    predictions_path = Path(temp_dir) / "predictions_confidence.csv"
-    result = runner.invoke(
-        app,
-        [
-            "predict-cmd",
-            str(model_path),
-            str(g_count_data),
-            "--with-confidence",
-            "--output-path",
-            str(predictions_path),
-        ],
-    )
-
-    assert result.exit_code == 0
-    assert predictions_path.exists()
-
-    # Verify predictions file has expected columns
-    predictions_df = pd.read_csv(predictions_path)
-    assert "sequence" in predictions_df.columns
-    assert "prediction" in predictions_df.columns
-    assert "confidence" in predictions_df.columns
-
-
 def test_cli_compare_embeddings(g_count_data, temp_dir):
     """Test CLI for comparing embedding methods."""
     runner = CliRunner()

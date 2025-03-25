@@ -19,9 +19,6 @@ Support for more sequence embedding methods beyond one-hot encoding, such as int
 ### Batch Processing for Large Datasets
 Implement efficient batch processing for datasets that are too large to fit in memory, especially when using more complex embedding methods that require significant computational resources.
 
-### Confidence Calibration
-Implement methods to calibrate confidence scores for classification tasks to ensure they accurately reflect prediction certainty, providing more reliable uncertainty estimates.
-
 ### Cluster-Based Cross-Validation Framework
 Enhance the validation strategy with cluster-based cross-validation, where sequences are clustered at a specified identity level (e.g., using CD-HIT) and entire clusters are left out during training. This approach provides a more realistic assessment of model generalizability to truly novel sequences.
 

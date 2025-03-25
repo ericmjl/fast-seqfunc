@@ -125,16 +125,6 @@ model = train_model(
 )
 ```
 
-### Getting Confidence Estimates
-
-```python
-predictions, confidence = predict(
-    model,
-    sequences,
-    return_confidence=True
-)
-```
-
 ### Handling Variable Length Sequences
 
 Fast-SeqFunc handles variable length sequences with configurable padding:

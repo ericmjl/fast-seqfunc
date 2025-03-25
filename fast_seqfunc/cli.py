@@ -84,9 +84,6 @@ def predict_cmd(
     output_path: Path = typer.Option(
         Path("predictions.csv"), help="Path to save predictions"
     ),
-    with_confidence: bool = typer.Option(
-        False, help="Include confidence estimates if available"
-    ),
 ):
     """Generate predictions for new sequences using a trained model."""
     logger.info(f"Loading model from {model_path}...")
@@ -103,34 +100,18 @@ def predict_cmd(
 
     # Generate predictions
     logger.info("Generating predictions...")
-    if with_confidence:
-        predictions, confidence = predict(
-            model_info=model_info,
-            sequences=data[sequence_col],
-            return_confidence=True,
-        )
+    predictions = predict(
+        model_info=model_info,
+        sequences=data[sequence_col],
+    )
 
-        # Save predictions with confidence
-        result_df = pd.DataFrame(
-            {
-                sequence_col: data[sequence_col],
-                "prediction": predictions,
-                "confidence": confidence,
-            }
-        )
-    else:
-        predictions = predict(
-            model_info=model_info,
-            sequences=data[sequence_col],
-        )
-
-        # Save predictions
-        result_df = pd.DataFrame(
-            {
-                sequence_col: data[sequence_col],
-                "prediction": predictions,
-            }
-        )
+    # Save predictions
+    result_df = pd.DataFrame(
+        {
+            sequence_col: data[sequence_col],
+            "prediction": predictions,
+        }
+    )
 
     # Save to CSV
     result_df.to_csv(output_path, index=False)

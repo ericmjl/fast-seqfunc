@@ -194,41 +194,31 @@ plt.savefig(output_dir / "binary_confusion_matrix.png", dpi=300)
 
 # Try to get probability estimates (if model supports it)
 try:
-    # Return raw probabilities for ROC curve
-    proba = predict(model_info, test_data["sequence"], return_confidence=True)[1]
+    # For this tutorial, we'll use a simplified approach since confidence scores are not available
+    # In a real implementation, you'd need access to the raw model's predict_proba method
+
+    logger.warning("ROC and PR curves require probability estimates which are not supported in this version")
+    logger.warning("We're skipping these visualizations in this tutorial")
+
+    """
+    # Below is example code that would work if your model provides probability estimates:
+
+    # Get class probabilities (if available)
+    # y_prob = model.predict_proba(X_test)[:, 1]  # probability of positive class
 
     # Plot ROC curve
-    fpr, tpr, _ = roc_curve(true_values, proba)
-    roc_auc = auc(fpr, tpr)
+    # fpr, tpr, _ = roc_curve(true_values, y_prob)
+    # roc_auc = auc(fpr, tpr)
 
-    plt.figure(figsize=(8, 6))
-    plt.plot(fpr, tpr, color='darkorange', lw=2,
-             label=f'ROC curve (area = {roc_auc:.2f})')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic (ROC)')
-    plt.legend(loc="lower right")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(output_dir / "binary_roc_curve.png", dpi=300)
-
-    # Plot Precision-Recall curve
-    precision, recall, _ = precision_recall_curve(true_values, proba)
-    avg_precision = average_precision_score(true_values, proba)
-
-    plt.figure(figsize=(8, 6))
-    plt.plot(recall, precision, color='green', lw=2,
-             label=f'PR curve (AP = {avg_precision:.2f})')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-    plt.legend(loc="lower left")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(output_dir / "binary_precision_recall_curve.png", dpi=300)
+    # plt.figure(figsize=(8, 6))
+    # plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+    # plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    # plt.xlabel('False Positive Rate')
+    # plt.ylabel('True Positive Rate')
+    # plt.title('Receiver Operating Characteristic (ROC)')
+    # plt.legend(loc="lower right")
+    # plt.savefig(output_dir / "binary_roc_curve.png", dpi=300)
+    """
 
 except Exception as e:
     logger.warning(f"Could not generate ROC/PR curves: {e}")
