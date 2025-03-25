@@ -65,14 +65,19 @@ class OneHotEmbedder:
 
         return self
 
-    def transform(self, sequences: Union[List[str], pd.Series]) -> np.ndarray:
+    def transform(
+        self, sequences: Union[List[str], pd.Series]
+    ) -> Union[np.ndarray, List[np.ndarray]]:
         """Transform sequences to one-hot encodings.
 
         If sequences are of different lengths and pad_sequences=True, they
         will be padded to the max_length with the gap character.
 
+        If pad_sequences=False, this returns a list of arrays of different sizes.
+
         :param sequences: List or Series of sequences to embed
-        :return: Array of one-hot encodings
+        :return: Array of one-hot encodings if pad_sequences=True,
+            otherwise list of arrays
         """
         if isinstance(sequences, pd.Series):
             sequences = sequences.tolist()
@@ -90,13 +95,21 @@ class OneHotEmbedder:
             embedding = self._one_hot_encode(sequence)
             embeddings.append(embedding)
 
-        return np.vstack(embeddings)
+        # If padding is enabled, stack the embeddings
+        # Otherwise, return the list of embeddings
+        if self.pad_sequences:
+            return np.vstack(embeddings)
+        else:
+            return embeddings
 
-    def fit_transform(self, sequences: Union[List[str], pd.Series]) -> np.ndarray:
+    def fit_transform(
+        self, sequences: Union[List[str], pd.Series]
+    ) -> Union[np.ndarray, List[np.ndarray]]:
         """Fit and transform in one step.
 
         :param sequences: Sequences to encode
-        :return: Array of one-hot encodings
+        :return: Array of one-hot encodings if pad_sequences=True,
+            otherwise list of arrays
         """
         return self.fit(sequences).transform(sequences)
 
