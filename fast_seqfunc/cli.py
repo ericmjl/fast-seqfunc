@@ -14,7 +14,13 @@ import pandas as pd
 import typer
 from loguru import logger
 
-from fast_seqfunc.core import load_model, predict, save_model, train_model
+from fast_seqfunc.core import (
+    evaluate_model,
+    load_model,
+    predict,
+    save_model,
+    train_model,
+)
 
 app = typer.Typer()
 
@@ -81,7 +87,7 @@ def predict_cmd(
 ):
     """Generate predictions for new sequences using a trained model."""
     logger.info(f"Loading model from {model_path}...")
-    model = load_model(model_path)
+    model_info = load_model(model_path)
 
     # Load input data
     logger.info(f"Loading sequences from {input_data}...")
@@ -96,7 +102,7 @@ def predict_cmd(
     logger.info("Generating predictions...")
     if with_confidence:
         predictions, confidence = predict(
-            model=model,
+            model_info=model_info,
             sequences=data[sequence_col],
             return_confidence=True,
         )
@@ -111,7 +117,7 @@ def predict_cmd(
         )
     else:
         predictions = predict(
-            model=model,
+            model_info=model_info,
             sequences=data[sequence_col],
         )
 
@@ -162,7 +168,7 @@ def compare_embeddings(
             logger.info(f"Training with {method} embeddings...")
 
             # Train model with this embedding method
-            model = train_model(
+            model_info = train_model(
                 train_data=train_data,
                 val_data=val_data,
                 test_data=test_data,
@@ -176,7 +182,20 @@ def compare_embeddings(
             # Evaluate on test data if provided
             if test_data:
                 test_df = pd.read_csv(test_data)
-                metrics = model.evaluate(test_df[sequence_col], test_df[target_col])
+
+                # Extract model components
+                model = model_info["model"]
+                embedder = model_info["embedder"]
+                embed_cols = model_info["embed_cols"]
+
+                metrics = evaluate_model(
+                    model=model,
+                    X_test=test_df[sequence_col],
+                    y_test=test_df[target_col],
+                    embedder=embedder,
+                    model_type=model_type,
+                    embed_cols=embed_cols,
+                )
 
                 # Add method and metrics to results
                 result = {"embedding_method": method, **metrics}
