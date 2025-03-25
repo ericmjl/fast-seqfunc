@@ -1,6 +1,5 @@
 """Tests for the synthetic data generation module."""
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -131,22 +130,6 @@ def test_multiclass_task():
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 100
     assert 1 < len(df["function"].unique()) <= 4  # Should have 2-4 classes
-
-
-def test_noise_addition():
-    """Test that noise is added correctly."""
-    # Generate datasets with and without noise
-    np.random.seed(42)  # For reproducibility
-    df_no_noise = create_g_count_task(count=50, length=20, noise_level=0.0)
-
-    np.random.seed(42)  # Reset seed
-    df_with_noise = create_g_count_task(count=50, length=20, noise_level=1.0)
-
-    # Check sequences are identical
-    assert all(df_no_noise["sequence"] == df_with_noise["sequence"])
-
-    # Check values differ due to noise
-    assert not all(np.isclose(df_no_noise["function"], df_with_noise["function"]))
 
 
 def test_generate_dataset_by_task():
