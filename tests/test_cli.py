@@ -92,6 +92,7 @@ def test_cli_describe():
     assert "sequence-function" in result.stdout
 
 
+@pytest.mark.slow
 def test_cli_g_count_regression(g_count_data, temp_dir):
     """Test CLI with G-count regression task."""
     runner = CliRunner()
@@ -143,6 +144,7 @@ def test_cli_g_count_regression(g_count_data, temp_dir):
     assert "prediction" in predictions_df.columns
 
 
+@pytest.mark.slow
 def test_cli_classification(binary_classification_data, temp_dir):
     """Test CLI with binary classification task."""
     runner = CliRunner()
@@ -194,6 +196,7 @@ def test_cli_classification(binary_classification_data, temp_dir):
     assert "prediction" in predictions_df.columns
 
 
+@pytest.mark.slow
 def test_cli_multiclass(multiclass_data, temp_dir):
     """Test CLI with multi-class classification task."""
     runner = CliRunner()
@@ -245,6 +248,7 @@ def test_cli_multiclass(multiclass_data, temp_dir):
     assert "prediction" in predictions_df.columns
 
 
+@pytest.mark.slow
 def test_cli_compare_embeddings(g_count_data, temp_dir):
     """Test CLI for comparing embedding methods."""
     runner = CliRunner()
@@ -270,6 +274,7 @@ def test_cli_compare_embeddings(g_count_data, temp_dir):
     assert comparison_path.exists()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "task",
     [

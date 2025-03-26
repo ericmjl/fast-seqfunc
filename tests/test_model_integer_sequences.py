@@ -13,6 +13,7 @@ from fast_seqfunc.embedders import OneHotEmbedder
 from fast_seqfunc.synthetic import generate_integer_function_data
 
 
+@pytest.mark.slow
 def test_model_training_on_integer_sequences():
     """Test training a model on comma-delimited integer sequences."""
     # Generate synthetic data with integer sequences
