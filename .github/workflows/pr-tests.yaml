@@ -47,13 +47,21 @@ jobs:
 
           echo "Running tests with marker: -m \"$MARKER\""
 
-          # Run pytest directly and let its exit code propagate
-          pixi run -e tests -- pytest -m "$MARKER" --cov --cov-report=xml:$COVERAGE_FILE --cov-report=term-missing -v
+          # Run tests and capture the output for analysis
+          pixi run -e tests -- pytest -m "$MARKER" --cov --cov-report=xml:$COVERAGE_FILE --cov-report=term-missing -v | tee pytest_output.txt
 
-          # After tests complete successfully, count the results for the summary
-          PASSED=$(find .pytest_cache -name 'v/*/test_results.json' -exec cat {} \; | grep -o '"outcome": "passed"' | wc -l)
-          FAILED=$(find .pytest_cache -name 'v/*/test_results.json' -exec cat {} \; | grep -o '"outcome": "failed"' | wc -l)
-          SKIPPED=$(find .pytest_cache -name 'v/*/test_results.json' -exec cat {} \; | grep -o '"outcome": "skipped"' | wc -l)
+          # Extract test counts from the last line of output which has format like:
+          # "67 passed, 3 skipped, 8 deselected in 2.17s"
+          SUMMARY=$(tail -n 10 pytest_output.txt | grep -o "[0-9]* passed, [0-9]* skipped" | tail -n 1)
+          PASSED=$(echo $SUMMARY | grep -o "[0-9]* passed" | grep -o "[0-9]*")
+          SKIPPED=$(echo $SUMMARY | grep -o "[0-9]* skipped" | grep -o "[0-9]*")
+
+          # Check if any tests failed
+          if grep -q "FAILED" pytest_output.txt; then
+            FAILED=$(grep -o "[0-9]* failed" pytest_output.txt | grep -o "[0-9]*")
+          else
+            FAILED=0
+          fi
 
           # Set outputs for summary
           echo "passed=$PASSED" >> $GITHUB_OUTPUT
