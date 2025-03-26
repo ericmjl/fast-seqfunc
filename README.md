@@ -85,19 +85,22 @@ model.save("my_model.pkl")
 Train a model:
 
 ```bash
-fast-seqfunc train train_data.csv --sequence-col sequence --target-col function --embedding-method one-hot --output-path model.pkl
+# All outputs (model, metrics, cache) will be saved to the 'outputs' directory
+fast-seqfunc train train_data.csv --sequence-col sequence --target-col function --embedding-method one-hot --output-dir outputs
 ```
 
 Make predictions:
 
 ```bash
-fast-seqfunc predict-cmd model.pkl new_sequences.csv --output-path predictions.csv
+# All prediction outputs will be saved to the 'prediction_outputs' directory
+fast-seqfunc predict-cmd outputs/model.pkl new_sequences.csv --output-dir prediction_outputs
 ```
 
 Compare embedding methods:
 
 ```bash
-fast-seqfunc compare-embeddings train_data.csv --test-data test_data.csv --output-path comparison.csv
+# All outputs (comparison results, metrics, models, cache) will be saved to the 'comparison_outputs' directory
+fast-seqfunc compare-embeddings train_data.csv --test-data test_data.csv --output-dir comparison_outputs
 ```
 
 ## Advanced Usage
@@ -111,6 +114,85 @@ model = train_model(
     train_data=train_data,
     embedding_method=["one-hot", "carp", "esm2"],
 )
+```
+
+### Detailed Performance Metrics and Visualizations
+
+The output directories from CLI commands contain comprehensive model performance metrics and visualizations:
+
+```
+outputs/                          # Main output directory
+├── model.pkl                     # Saved model
+├── summary.json                  # Summary of output locations and parameters
+├── metrics/                      # Performance metrics and visualizations
+│   ├── one-hot_metrics.json      # Detailed metrics in JSON format
+│   ├── one-hot_predictions.csv   # Raw predictions and true values
+│   ├── one-hot_scatter_plot.png  # Visualization plots
+│   ├── one-hot_residual_plot.png
+│   └── ...
+└── cache/                        # Cached embeddings
+```
+
+For predictions:
+
+```
+prediction_outputs/               # Prediction output directory
+├── predictions.csv               # Saved predictions
+├── predictions_histogram.png     # Histogram of prediction values (for regression)
+└── prediction_summary.json       # Summary of prediction parameters
+```
+
+When comparing embedding methods, a similar structure is created:
+
+```
+comparison_outputs/
+├── embedding_comparison.csv      # Table comparing all methods
+├── embedding_comparison_plot.png # Bar chart comparing metrics across methods
+├── summary.json                  # Summary of output locations and parameters
+├── models/                       # Saved models for each method
+│   ├── one-hot_model.pkl
+│   ├── carp_model.pkl
+│   └── esm2_model.pkl
+├── metrics/                      # Performance metrics for each method
+│   ├── one-hot_metrics.json
+│   ├── carp_metrics.json
+│   └── ...
+└── cache/                        # Cached embeddings
+```
+
+You can also generate these outputs programmatically:
+
+```python
+from pathlib import Path
+from fast_seqfunc import train_model, save_model, save_detailed_metrics
+
+# Create output directories
+output_dir = Path("my_model_outputs")
+output_dir.mkdir(exist_ok=True)
+metrics_dir = output_dir / "metrics"
+metrics_dir.mkdir(exist_ok=True)
+cache_dir = output_dir / "cache"
+cache_dir.mkdir(exist_ok=True)
+
+# Train model
+model_info = train_model(
+    train_data=train_data,
+    test_data=test_data,
+    embedding_method="one-hot",
+    cache_dir=cache_dir,
+)
+
+# Save model
+save_model(model_info, output_dir / "model.pkl")
+
+# Save detailed metrics if test data was provided
+if model_info.get("test_results"):
+    save_detailed_metrics(
+        metrics_data=model_info["test_results"],
+        output_dir=metrics_dir,
+        model_type=model_info["model_type"],
+        embedding_method="one-hot"
+    )
 ```
 
 ### Custom Metrics for Optimization

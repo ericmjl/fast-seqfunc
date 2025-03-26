@@ -149,7 +149,7 @@ Get an embedder instance based on method name.
 ```python
 from fast_seqfunc.core import evaluate_model
 
-metrics = evaluate_model(
+results = evaluate_model(
     model,
     X_test,
     y_test,
@@ -172,4 +172,47 @@ Evaluate model performance on test data.
 
 **Returns**:
 
-- Dictionary of performance metrics.
+- Dictionary containing metrics and prediction data with structure:
+  ```
+  {
+     "metrics": {metric_name: value, ...},
+     "predictions_data": {
+         "y_true": [...],
+         "y_pred": [...]
+     }
+  }
+  ```
+
+### `save_detailed_metrics`
+
+```python
+from fast_seqfunc.core import save_detailed_metrics
+
+save_detailed_metrics(
+    metrics_data,
+    output_dir,
+    model_type,
+    embedding_method="unknown"
+)
+```
+
+Save detailed model metrics to files in the specified directory.
+
+**Parameters**:
+
+- `metrics_data`: Dictionary containing metrics and prediction data from `evaluate_model`.
+- `output_dir`: Directory to save metrics files.
+- `model_type`: Type of model (regression or classification).
+- `embedding_method`: Embedding method used for this model.
+
+**Returns**:
+
+- None
+
+**Output Files**:
+
+- JSON file with detailed metrics
+- CSV file with raw predictions and true values
+- Visualization plots based on model type:
+  - For regression: scatter plot, residual plot
+  - For classification: confusion matrix
