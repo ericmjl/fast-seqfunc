@@ -90,7 +90,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           uv tool install llamabot[cli]
-          llamabot configure default-model --model-name="${{ secrets.DEFAULT_LANGUAGE_MODEL }}"
+          llamabot configure default-model --model-name "${{ secrets.DEFAULT_LANGUAGE_MODEL }}"
           llamabot git write-release-notes
 
       - name: Commit release notes
