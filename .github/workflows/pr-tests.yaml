@@ -47,37 +47,18 @@ jobs:
 
           echo "Running tests with marker: -m \"$MARKER\""
 
-          # Run tests and capture output and exit code
-          set +e
-          TEST_OUTPUT=$(pixi run -e tests -- pytest -m "$MARKER" --cov --cov-report=xml:$COVERAGE_FILE --cov-report=term-missing -v)
-          TEST_EXIT_CODE=$?
-          set -e
+          # Run pytest directly and let its exit code propagate
+          pixi run -e tests -- pytest -m "$MARKER" --cov --cov-report=xml:$COVERAGE_FILE --cov-report=term-missing -v
 
-          # Count test results
-          PASSED=$(echo "$TEST_OUTPUT" | grep -o "passed" | wc -l)
-          FAILED=$(echo "$TEST_OUTPUT" | grep -o "failed" | wc -l)
-          SKIPPED=$(echo "$TEST_OUTPUT" | grep -o "skipped" | wc -l)
+          # After tests complete successfully, count the results for the summary
+          PASSED=$(find .pytest_cache -name 'v/*/test_results.json' -exec cat {} \; | grep -o '"outcome": "passed"' | wc -l)
+          FAILED=$(find .pytest_cache -name 'v/*/test_results.json' -exec cat {} \; | grep -o '"outcome": "failed"' | wc -l)
+          SKIPPED=$(find .pytest_cache -name 'v/*/test_results.json' -exec cat {} \; | grep -o '"outcome": "skipped"' | wc -l)
 
           # Set outputs for summary
-          echo "exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
           echo "passed=$PASSED" >> $GITHUB_OUTPUT
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
-
-          # Display test output
-          echo "$TEST_OUTPUT"
-
-          # Debug info
-          echo "Test exit code: $TEST_EXIT_CODE"
-
-          # Only exit with non-zero if tests actually failed
-          if [ $FAILED -gt 0 ]; then
-            echo "Tests failed, exiting with code 1"
-            exit 1
-          else
-            echo "All tests passed or skipped, exiting with code 0"
-            exit 0
-          fi
 
       - name: Create test summary
         if: always()
@@ -86,7 +67,6 @@ jobs:
           echo "- ✅ Passed: ${{ steps.run-tests.outputs.passed || 0 }}" >> $GITHUB_STEP_SUMMARY
           echo "- ❌ Failed: ${{ steps.run-tests.outputs.failed || 0 }}" >> $GITHUB_STEP_SUMMARY
           echo "- ⏩ Skipped: ${{ steps.run-tests.outputs.skipped || 0 }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Exit Code: ${{ steps.run-tests.outputs.exit_code || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
 
       # https://github.com/codecov/codecov-action
       - name: Upload code coverage
