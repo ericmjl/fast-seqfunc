@@ -26,6 +26,7 @@ jobs:
     name: ${{ github.event_name == 'pull_request' && '(Dry Run) ' || '' }}Publish Python Package to PyPI
     permissions:
       id-token: write
+      contents: write
 
     defaults:
       run:
