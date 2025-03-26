@@ -96,7 +96,8 @@ def test_cli_describe():
 def test_cli_g_count_regression(g_count_data, temp_dir):
     """Test CLI with G-count regression task."""
     runner = CliRunner()
-    model_path = Path(temp_dir) / "model.pkl"
+    output_dir = Path(temp_dir) / "outputs"
+    model_path = output_dir / "model.pkl"
 
     # Train model
     result = runner.invoke(
@@ -112,8 +113,10 @@ def test_cli_g_count_regression(g_count_data, temp_dir):
             "one-hot",
             "--model-type",
             "regression",
-            "--output-path",
-            str(model_path),
+            "--output-dir",
+            str(output_dir),
+            "--model-filename",
+            "model.pkl",
         ],
     )
 
@@ -121,7 +124,8 @@ def test_cli_g_count_regression(g_count_data, temp_dir):
     assert model_path.exists()
 
     # Make predictions
-    predictions_path = Path(temp_dir) / "predictions.csv"
+    predictions_dir = Path(temp_dir) / "prediction_outputs"
+    predictions_path = predictions_dir / "predictions.csv"
     result = runner.invoke(
         app,
         [
@@ -130,8 +134,10 @@ def test_cli_g_count_regression(g_count_data, temp_dir):
             str(g_count_data),
             "--sequence-col",
             "sequence",
-            "--output-path",
-            str(predictions_path),
+            "--output-dir",
+            str(predictions_dir),
+            "--predictions-filename",
+            "predictions.csv",
         ],
     )
 
@@ -148,7 +154,8 @@ def test_cli_g_count_regression(g_count_data, temp_dir):
 def test_cli_classification(binary_classification_data, temp_dir):
     """Test CLI with binary classification task."""
     runner = CliRunner()
-    model_path = Path(temp_dir) / "model_classification.pkl"
+    output_dir = Path(temp_dir) / "class_outputs"
+    model_path = output_dir / "model_classification.pkl"
 
     # Train model
     result = runner.invoke(
@@ -164,8 +171,10 @@ def test_cli_classification(binary_classification_data, temp_dir):
             "one-hot",
             "--model-type",
             "classification",
-            "--output-path",
-            str(model_path),
+            "--output-dir",
+            str(output_dir),
+            "--model-filename",
+            "model_classification.pkl",
         ],
     )
 
@@ -173,7 +182,8 @@ def test_cli_classification(binary_classification_data, temp_dir):
     assert model_path.exists()
 
     # Make predictions
-    predictions_path = Path(temp_dir) / "predictions_classification.csv"
+    predictions_dir = Path(temp_dir) / "class_prediction_outputs"
+    predictions_path = predictions_dir / "predictions_classification.csv"
     result = runner.invoke(
         app,
         [
@@ -182,8 +192,10 @@ def test_cli_classification(binary_classification_data, temp_dir):
             str(binary_classification_data),
             "--sequence-col",
             "sequence",
-            "--output-path",
-            str(predictions_path),
+            "--output-dir",
+            str(predictions_dir),
+            "--predictions-filename",
+            "predictions_classification.csv",
         ],
     )
 
@@ -200,7 +212,8 @@ def test_cli_classification(binary_classification_data, temp_dir):
 def test_cli_multiclass(multiclass_data, temp_dir):
     """Test CLI with multi-class classification task."""
     runner = CliRunner()
-    model_path = Path(temp_dir) / "model_multiclass.pkl"
+    output_dir = Path(temp_dir) / "multi_outputs"
+    model_path = output_dir / "model_multiclass.pkl"
 
     # Train model
     result = runner.invoke(
@@ -216,8 +229,10 @@ def test_cli_multiclass(multiclass_data, temp_dir):
             "one-hot",
             "--model-type",
             "classification",
-            "--output-path",
-            str(model_path),
+            "--output-dir",
+            str(output_dir),
+            "--model-filename",
+            "model_multiclass.pkl",
         ],
     )
 
@@ -225,7 +240,8 @@ def test_cli_multiclass(multiclass_data, temp_dir):
     assert model_path.exists()
 
     # Make predictions
-    predictions_path = Path(temp_dir) / "predictions_multiclass.csv"
+    predictions_dir = Path(temp_dir) / "multi_prediction_outputs"
+    predictions_path = predictions_dir / "predictions_multiclass.csv"
     result = runner.invoke(
         app,
         [
@@ -234,8 +250,10 @@ def test_cli_multiclass(multiclass_data, temp_dir):
             str(multiclass_data),
             "--sequence-col",
             "sequence",
-            "--output-path",
-            str(predictions_path),
+            "--output-dir",
+            str(predictions_dir),
+            "--predictions-filename",
+            "predictions_multiclass.csv",
         ],
     )
 
@@ -252,7 +270,8 @@ def test_cli_multiclass(multiclass_data, temp_dir):
 def test_cli_compare_embeddings(g_count_data, temp_dir):
     """Test CLI for comparing embedding methods."""
     runner = CliRunner()
-    comparison_path = Path(temp_dir) / "embedding_comparison.csv"
+    output_dir = Path(temp_dir) / "comparison_outputs"
+    comparison_path = output_dir / "embedding_comparison.csv"
 
     # Run comparison
     result = runner.invoke(
@@ -260,8 +279,8 @@ def test_cli_compare_embeddings(g_count_data, temp_dir):
         [
             "compare-embeddings",
             str(g_count_data),
-            "--output-path",
-            str(comparison_path),
+            "--output-dir",
+            str(output_dir),
         ],
     )
 
@@ -293,24 +312,36 @@ def test_cli_with_different_tasks(task, temp_dir):
     df.to_csv(data_path, index=False)
 
     # Train model
-    model_path = Path(temp_dir) / f"{task}_model.pkl"
+    output_dir = Path(temp_dir) / f"{task}_outputs"
+    model_path = output_dir / f"{task}_model.pkl"
     result = runner.invoke(
-        app, ["train", str(data_path), "--output-path", str(model_path)]
+        app,
+        [
+            "train",
+            str(data_path),
+            "--output-dir",
+            str(output_dir),
+            "--model-filename",
+            f"{task}_model.pkl",
+        ],
     )
 
     assert result.exit_code == 0
     assert model_path.exists()
 
     # Make predictions
-    predictions_path = Path(temp_dir) / f"{task}_predictions.csv"
+    predictions_dir = Path(temp_dir) / f"{task}_prediction_outputs"
+    predictions_path = predictions_dir / f"{task}_predictions.csv"
     result = runner.invoke(
         app,
         [
             "predict-cmd",
             str(model_path),
             str(data_path),
-            "--output-path",
-            str(predictions_path),
+            "--output-dir",
+            str(predictions_dir),
+            "--predictions-filename",
+            f"{task}_predictions.csv",
         ],
     )
 
