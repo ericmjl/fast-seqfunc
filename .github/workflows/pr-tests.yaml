@@ -52,23 +52,40 @@ jobs:
           # Store the exit code of pytest
           PYTEST_EXIT_CODE=${PIPESTATUS[0]}
 
-          # Extract test counts from the last line of output which has format like:
-          # "67 passed, 3 skipped, 8 deselected in 2.17s"
-          SUMMARY=$(tail -n 10 pytest_output.txt | grep -o "[0-9]* passed, [0-9]* skipped" | tail -n 1)
-          PASSED=$(echo $SUMMARY | grep -o "[0-9]* passed" | grep -o "[0-9]*")
-          SKIPPED=$(echo $SUMMARY | grep -o "[0-9]* skipped" | grep -o "[0-9]*")
+          # Extract test counts from the actual output format
+          # Look for lines like "8 passed, 70 deselected, 18 warnings in 272.63s (0:04:32)"
+          if grep -q "passed" pytest_output.txt; then
+            PASSED=$(grep -o "[0-9]* passed" pytest_output.txt | tail -n1 | grep -o "[0-9]*")
+          else
+            PASSED=0
+          fi
 
-          # Check if any tests failed
-          if grep -q "FAILED" pytest_output.txt; then
-            FAILED=$(grep -o "[0-9]* failed" pytest_output.txt | grep -o "[0-9]*")
+          if grep -q "failed" pytest_output.txt; then
+            FAILED=$(grep -o "[0-9]* failed" pytest_output.txt | tail -n1 | grep -o "[0-9]*")
           else
             FAILED=0
           fi
+
+          if grep -q "skipped" pytest_output.txt; then
+            SKIPPED=$(grep -o "[0-9]* skipped" pytest_output.txt | tail -n1 | grep -o "[0-9]*")
+          else
+            SKIPPED=0
+          fi
+
+          if grep -q "deselected" pytest_output.txt; then
+            DESELECTED=$(grep -o "[0-9]* deselected" pytest_output.txt | tail -n1 | grep -o "[0-9]*")
+          else
+            DESELECTED=0
+          fi
+
+          # Print counts for debugging
+          echo "Found counts - Passed: $PASSED, Failed: $FAILED, Skipped: $SKIPPED, Deselected: $DESELECTED"
 
           # Set outputs for summary
           echo "passed=$PASSED" >> $GITHUB_OUTPUT
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+          echo "deselected=$DESELECTED" >> $GITHUB_OUTPUT
 
           # Exit with the pytest exit code to properly indicate test failure
           exit $PYTEST_EXIT_CODE
@@ -86,6 +103,7 @@ jobs:
           echo "- ✅ Passed: ${{ steps.run-tests.outputs.passed || 0 }}" >> $GITHUB_STEP_SUMMARY
           echo "- ❌ Failed: ${{ steps.run-tests.outputs.failed || 0 }}" >> $GITHUB_STEP_SUMMARY
           echo "- ⏩ Skipped: ${{ steps.run-tests.outputs.skipped || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Deselected: ${{ steps.run-tests.outputs.deselected || 0 }}" >> $GITHUB_STEP_SUMMARY
 
       # https://github.com/codecov/codecov-action
       - name: Upload code coverage
