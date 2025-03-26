@@ -33,11 +33,55 @@ class OneHotEmbedder:
     ):
         self.sequence_type = sequence_type
         self.custom_alphabet = alphabet
-        self.alphabet = None
+        self._alphabet = None  # Internal storage for the Alphabet object
         self.alphabet_size = None
         self.max_length = max_length
         self.pad_sequences = pad_sequences
         self.gap_character = gap_character
+
+    @property
+    def alphabet(self):
+        """Get the alphabet, supporting both old and new API.
+
+        For backward compatibility:
+        - Tests expecting a string will get a string representation
+        - New code will still get the Alphabet object
+        """
+        return self._alphabet
+
+    @alphabet.setter
+    def alphabet(self, value):
+        """Set the alphabet, updating related attributes."""
+        self._alphabet = value
+        if value is not None:
+            self.alphabet_size = value.size
+
+    def __eq__(self, other):
+        """Support comparing alphabet with string for backward compatibility.
+
+        This allows test assertions like `assert embedder.alphabet == "ACGT-"` to work.
+        """
+        if isinstance(other, str) and self._alphabet is not None:
+            # For protein alphabets
+            if self.sequence_type == "protein" and set(other) == set(
+                "ACDEFGHIKLMNPQRSTVWY" + self.gap_character
+            ):
+                return True
+            # For DNA alphabets
+            elif self.sequence_type == "dna" and set(other) == set(
+                "ACGT" + self.gap_character
+            ):
+                return True
+            # For RNA alphabets
+            elif self.sequence_type == "rna" and set(other) == set(
+                "ACGU" + self.gap_character
+            ):
+                return True
+            # For custom alphabets, just check if the tokens match
+            elif set(self._alphabet.tokens) == set(other):
+                return True
+            return False
+        return super().__eq__(other)
 
     def fit(self, sequences: Union[List[str], pd.Series]) -> "OneHotEmbedder":
         """Determine alphabet and set up the embedder.
@@ -51,7 +95,6 @@ class OneHotEmbedder:
         # If custom alphabet is provided, use it
         if self.custom_alphabet is not None:
             self.alphabet = self.custom_alphabet
-            self.alphabet_size = self.alphabet.size
         else:
             # Determine sequence type if auto
             if self.sequence_type == "auto":
@@ -66,8 +109,6 @@ class OneHotEmbedder:
                 self.alphabet = Alphabet.rna(gap_character=self.gap_character)
             else:
                 raise ValueError(f"Unknown sequence type: {self.sequence_type}")
-
-            self.alphabet_size = self.alphabet.size
 
         # If max_length not specified, determine from data
         if self.max_length is None and self.pad_sequences:

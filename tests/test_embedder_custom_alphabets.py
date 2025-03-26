@@ -171,8 +171,11 @@ def test_invalid_tokens():
     embedder = OneHotEmbedder(alphabet=alphabet)
     embeddings = embedder.fit_transform(sequences)
 
+    # Get the correct embedding dimensions
+    alphabet_size = alphabet.size  # Should be 12 (0-10 + gap)
+
     # Check second sequence with invalid token
-    seq2_embedding = embeddings[1].reshape(3, 12)
+    seq2_embedding = embeddings[1].reshape(3, alphabet_size)
 
     # Position 1 should have no one-hot encoding (all zeros)
     # since 99 is not in the alphabet
@@ -189,10 +192,12 @@ def test_mixed_alphabets():
     embedder = OneHotEmbedder(alphabet=alphabet)
     embeddings = embedder.fit_transform(sequences)
 
+    # Get the correct embedding dimensions
+    alphabet_size = alphabet.size  # Should be 7 (0-5 + gap)
+    max_length = 4  # Determined by "A,C,G,T" tokenized length
+
     # Check second sequence with non-integer tokens
-    seq2_embedding = embeddings[1].reshape(
-        4, 7
-    )  # 7 token types in alphabet (0-5 + gap)
+    seq2_embedding = embeddings[1].reshape(max_length, alphabet_size)
 
     # All positions should have no one-hot encoding
     # since A,C,G,T are not in the integer alphabet
@@ -219,8 +224,9 @@ def test_prepare_data_for_model():
     X = embedder.fit_transform(sequences)
     y = np.array(labels)
 
-    # Check shapes
-    assert X.shape == (5, 4 * 7)  # 5 sequences, 4 tokens, 7 token types
+    # Check shapes - calculate expected dimensions dynamically
+    expected_shape = (5, 4 * alphabet.size)  # 5 sequences, 4 tokens, alphabet_size
+    assert X.shape == expected_shape
     assert y.shape == (5,)
 
 

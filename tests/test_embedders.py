@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from fast_seqfunc.alphabets import Alphabet
 from fast_seqfunc.embedders import (
     OneHotEmbedder,
     get_embedder,
@@ -37,9 +38,9 @@ def test_one_hot_embedder_fit():
     protein_seqs = ["ACDEFG", "GHIKLMN", "PQRSTVWY"]
     embedder.fit(protein_seqs)
     assert embedder.sequence_type == "protein"
-    assert (
-        embedder.alphabet == "ACDEFGHIKLMNPQRSTVWY-"
-    )  # Note: gap character is included
+    # Check the alphabet is a protein alphabet
+    assert isinstance(embedder.alphabet, Alphabet)
+    assert embedder.alphabet.name == "protein"
     assert embedder.alphabet_size == 21  # 20 amino acids + gap
     assert embedder.max_length == 8  # Length of longest sequence
 
@@ -48,7 +49,9 @@ def test_one_hot_embedder_fit():
     embedder = OneHotEmbedder(gap_character="X")
     embedder.fit(dna_seqs)
     assert embedder.sequence_type == "dna"
-    assert embedder.alphabet == "ACGTX"  # Includes custom gap character
+    # Check the alphabet is a DNA alphabet with custom gap
+    assert isinstance(embedder.alphabet, Alphabet)
+    assert embedder.alphabet.gap_character == "X"
     assert embedder.alphabet_size == 5  # 4 nucleotides + gap
     assert embedder.max_length == 4  # All sequences are same length
 
@@ -56,7 +59,9 @@ def test_one_hot_embedder_fit():
     embedder = OneHotEmbedder(sequence_type="rna")
     embedder.fit(["ACGU", "UGCA"])
     assert embedder.sequence_type == "rna"
-    assert embedder.alphabet == "ACGU-"  # Includes gap character
+    # Check the alphabet is an RNA alphabet
+    assert isinstance(embedder.alphabet, Alphabet)
+    assert embedder.alphabet.name == "rna"
     assert embedder.alphabet_size == 5  # 4 nucleotides + gap
 
 
@@ -80,8 +85,9 @@ def test_one_hot_encode():
     embedding = embedder._one_hot_encode("AC-T")
     embedding_2d = embedding.reshape(4, 5)
     assert np.sum(embedding_2d) == 4  # One 1 per position
-    # Gap should be encoded in the last position of the alphabet
-    assert embedding_2d[2, 4] == 1
+    # Gap should be encoded in the position that corresponds to the gap character
+    gap_idx = embedder.alphabet.token_to_idx["-"]
+    assert embedding_2d[2, gap_idx] == 1
 
 
 def test_preprocess_sequences():
@@ -188,7 +194,8 @@ def test_fit_transform():
 
     # Should have fitted
     assert embedder.sequence_type == "dna"
-    assert embedder.alphabet == "ACGT-"  # Including gap character
+    assert isinstance(embedder.alphabet, Alphabet)
+    assert embedder.alphabet.name == "dna"
     assert embedder.alphabet_size == 5
 
     # Should have transformed

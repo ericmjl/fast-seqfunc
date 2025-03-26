@@ -78,12 +78,16 @@ def test_model_prediction_on_integer_sequences():
     # Train a simple linear model
     model = LinearRegression().fit(X, y)
 
+    # Create embedding column names matching the actual dimensions
+    embed_dims = X.shape[1]
+    embed_cols = [f"embed_{i}" for i in range(embed_dims)]
+
     # Create a model info dictionary similar to what train_model returns
     model_info = {
         "model": model,
         "model_type": "regression",
         "embedder": embedder,
-        "embed_cols": [f"embed_{i}" for i in range(X.shape[1])],
+        "embed_cols": embed_cols,
     }
 
     # Test sequences
@@ -127,12 +131,16 @@ def test_model_serialization_with_integer_alphabet():
     # Train a simple linear model
     model = LinearRegression().fit(X, y)
 
+    # Create embedding column names matching the actual dimensions
+    embed_dims = X.shape[1]
+    embed_cols = [f"embed_{i}" for i in range(embed_dims)]
+
     # Create a model info dictionary similar to what train_model returns
     model_info = {
         "model": model,
         "model_type": "regression",
         "embedder": embedder,
-        "embed_cols": [f"embed_{i}" for i in range(X.shape[1])],
+        "embed_cols": embed_cols,
     }
 
     # Create a temporary file for saving the model
