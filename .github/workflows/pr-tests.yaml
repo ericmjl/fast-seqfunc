@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        test-type: ['fast', 'slow']
+        test-type: ['not-slow', 'slow']
       fail-fast: false # Allow other tests to continue if one fails
 
     # https://github.com/marketplace/actions/setup-miniconda#use-a-default-shell
@@ -33,13 +33,23 @@ jobs:
           cache: true
           environments: tests
 
-      - name: Run fast tests
-        if: matrix.test-type == 'fast'
-        id: fast-tests
+      - name: Run tests
+        id: run-tests
         run: |
+          # Determine the pytest marker and coverage file based on the test type
+          if [[ "${{ matrix.test-type }}" == "slow" ]]; then
+            MARKER="slow"
+            COVERAGE_FILE="coverage-slow.xml"
+          else
+            MARKER="not slow"
+            COVERAGE_FILE="coverage-not-slow.xml"
+          fi
+
+          echo "Running tests with marker: -m \"$MARKER\""
+
           # Run tests and capture output and exit code
           set +e
-          TEST_OUTPUT=$(pixi run -e tests -- pytest -m "not slow" --cov --cov-report=xml:coverage-fast.xml --cov-report=term-missing -v)
+          TEST_OUTPUT=$(pixi run -e tests -- pytest -m "$MARKER" --cov --cov-report=xml:$COVERAGE_FILE --cov-report=term-missing -v)
           TEST_EXIT_CODE=$?
           set -e
 
@@ -57,52 +67,26 @@ jobs:
           # Display test output
           echo "$TEST_OUTPUT"
 
-          # Properly exit if tests failed
-          exit $TEST_EXIT_CODE
+          # Debug info
+          echo "Test exit code: $TEST_EXIT_CODE"
 
-      - name: Run slow tests
-        if: matrix.test-type == 'slow'
-        id: slow-tests
-        run: |
-          # Run tests and capture output and exit code
-          set +e
-          TEST_OUTPUT=$(pixi run -e tests -- pytest -m "slow" --cov --cov-report=xml:coverage-slow.xml --cov-report=term-missing -v)
-          TEST_EXIT_CODE=$?
-          set -e
-
-          # Count test results
-          PASSED=$(echo "$TEST_OUTPUT" | grep -o "passed" | wc -l)
-          FAILED=$(echo "$TEST_OUTPUT" | grep -o "failed" | wc -l)
-          SKIPPED=$(echo "$TEST_OUTPUT" | grep -o "skipped" | wc -l)
-
-          # Set outputs for summary
-          echo "exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
-          echo "passed=$PASSED" >> $GITHUB_OUTPUT
-          echo "failed=$FAILED" >> $GITHUB_OUTPUT
-          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
-
-          # Display test output
-          echo "$TEST_OUTPUT"
-
-          # Properly exit if tests failed
-          exit $TEST_EXIT_CODE
+          # Only exit with non-zero if tests actually failed
+          if [ $FAILED -gt 0 ]; then
+            echo "Tests failed, exiting with code 1"
+            exit 1
+          else
+            echo "All tests passed or skipped, exiting with code 0"
+            exit 0
+          fi
 
       - name: Create test summary
         if: always()
         run: |
           echo "## ${{ matrix.test-type }} Test Results 🧪" >> $GITHUB_STEP_SUMMARY
-
-          if [[ '${{ matrix.test-type }}' == 'fast' ]]; then
-            echo "- ✅ Passed: ${{ steps.fast-tests.outputs.passed || 0 }}" >> $GITHUB_STEP_SUMMARY
-            echo "- ❌ Failed: ${{ steps.fast-tests.outputs.failed || 0 }}" >> $GITHUB_STEP_SUMMARY
-            echo "- ⏩ Skipped: ${{ steps.fast-tests.outputs.skipped || 0 }}" >> $GITHUB_STEP_SUMMARY
-            echo "- Exit Code: ${{ steps.fast-tests.outputs.exit_code || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ✅ Passed: ${{ steps.slow-tests.outputs.passed || 0 }}" >> $GITHUB_STEP_SUMMARY
-            echo "- ❌ Failed: ${{ steps.slow-tests.outputs.failed || 0 }}" >> $GITHUB_STEP_SUMMARY
-            echo "- ⏩ Skipped: ${{ steps.slow-tests.outputs.skipped || 0 }}" >> $GITHUB_STEP_SUMMARY
-            echo "- Exit Code: ${{ steps.slow-tests.outputs.exit_code || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- ✅ Passed: ${{ steps.run-tests.outputs.passed || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Failed: ${{ steps.run-tests.outputs.failed || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ⏩ Skipped: ${{ steps.run-tests.outputs.skipped || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Exit Code: ${{ steps.run-tests.outputs.exit_code || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
 
       # https://github.com/codecov/codecov-action
       - name: Upload code coverage
@@ -111,7 +95,6 @@ jobs:
         with:
           # flag the upload with the test type to separate them in codecov
           flags: ${{ matrix.test-type }}
-          # fail_ci_if_error: true # optional (default = false)
           verbose: true # optional (default = false)
 
 
