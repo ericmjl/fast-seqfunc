@@ -202,31 +202,38 @@ def predict(
         X_embedded = embedder.transform(sequences)
         X_df = pd.DataFrame(X_embedded, columns=embed_cols)
 
-        # Use the right PyCaret function based on model type
-        if model_type == "regression":
-            from pycaret.regression import predict_model
+        # Check if the model has a predict method (scikit-learn model)
+        if hasattr(model, "predict"):
+            logger.info("Using direct scikit-learn prediction")
+            return model.predict(X_df)
         else:
-            from pycaret.classification import predict_model
+            # Use PyCaret's predict_model function
+            logger.info("Using PyCaret's predict_model function")
+            if model_type == "regression":
+                from pycaret.regression import predict_model
+            else:
+                from pycaret.classification import predict_model
 
-        # Make predictions
-        predictions = predict_model(model, data=X_df)
+            # Make predictions using PyCaret
+            predictions = predict_model(model, data=X_df)
 
-        # Extract prediction column (name varies by PyCaret version)
-        pred_cols = [
-            col
-            for col in predictions.columns
-            if any(
-                kw in col.lower() for kw in ["prediction", "predict", "label", "class"]
-            )
-        ]
+            # Extract prediction column (name varies by PyCaret version)
+            pred_cols = [
+                col
+                for col in predictions.columns
+                if any(
+                    kw in col.lower()
+                    for kw in ["prediction", "predict", "label", "class"]
+                )
+            ]
 
-        if not pred_cols:
-            logger.error(
-                f"Cannot identify prediction column. Columns: {predictions.columns}"
-            )
-            raise ValueError("Unable to identify prediction column in output")
+            if not pred_cols:
+                logger.error(
+                    f"Cannot identify prediction column. Columns: {predictions.columns}"
+                )
+                raise ValueError("Unable to identify prediction column in output")
 
-        return predictions[pred_cols[0]].values
+            return predictions[pred_cols[0]].values
 
     except Exception as e:
         logger.error(f"Error during prediction: {str(e)}")
