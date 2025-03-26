@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the design for enhancing fast-seqfunc with support for custom alphabets, particularly focusing on handling mixed-length characters and various sequence storage formats. This feature will enable the library to work with non-standard sequence types, such as chemically modified amino acids, custom nucleotides, or integer-based sequence representations.
+This document outlines the design for enhancing fast-seqfunc with support for custom alphabets, particularly focusing on handling mixed-length characters and various sequence storage formats. This feature will enable the library to work with non-standard sequence types, such as chemically modified amino acids, custom nucleotides, or (more generically) integer-based sequence representations.
 
 ## Current Implementation
 

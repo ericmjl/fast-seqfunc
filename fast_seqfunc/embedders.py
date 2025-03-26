@@ -8,12 +8,15 @@ from typing import List, Literal, Optional, Union
 import numpy as np
 import pandas as pd
 
+from fast_seqfunc.alphabets import Alphabet
+
 
 class OneHotEmbedder:
     """One-hot encoding for protein or nucleotide sequences.
 
     :param sequence_type: Type of sequences to encode ("protein", "dna", "rna",
         or "auto")
+    :param alphabet: Custom alphabet to use for encoding (overrides sequence_type)
     :param max_length: Maximum sequence length (will pad/truncate to this length)
     :param pad_sequences: Whether to pad sequences of different lengths
         to the maximum length
@@ -23,11 +26,13 @@ class OneHotEmbedder:
     def __init__(
         self,
         sequence_type: Literal["protein", "dna", "rna", "auto"] = "auto",
+        alphabet: Optional[Alphabet] = None,
         max_length: Optional[int] = None,
         pad_sequences: bool = True,
         gap_character: str = "-",
     ):
         self.sequence_type = sequence_type
+        self.custom_alphabet = alphabet
         self.alphabet = None
         self.alphabet_size = None
         self.max_length = max_length
@@ -43,25 +48,36 @@ class OneHotEmbedder:
         if isinstance(sequences, pd.Series):
             sequences = sequences.tolist()
 
-        # Determine sequence type if auto
-        if self.sequence_type == "auto":
-            self.sequence_type = self._detect_sequence_type(sequences)
-
-        # Set alphabet based on sequence type
-        if self.sequence_type == "protein":
-            self.alphabet = "ACDEFGHIKLMNPQRSTVWY" + self.gap_character
-        elif self.sequence_type == "dna":
-            self.alphabet = "ACGT" + self.gap_character
-        elif self.sequence_type == "rna":
-            self.alphabet = "ACGU" + self.gap_character
+        # If custom alphabet is provided, use it
+        if self.custom_alphabet is not None:
+            self.alphabet = self.custom_alphabet
+            self.alphabet_size = self.alphabet.size
         else:
-            raise ValueError(f"Unknown sequence type: {self.sequence_type}")
+            # Determine sequence type if auto
+            if self.sequence_type == "auto":
+                self.sequence_type = self._detect_sequence_type(sequences)
 
-        self.alphabet_size = len(self.alphabet)
+            # Create standard alphabet based on sequence type
+            if self.sequence_type == "protein":
+                self.alphabet = Alphabet.protein(gap_character=self.gap_character)
+            elif self.sequence_type == "dna":
+                self.alphabet = Alphabet.dna(gap_character=self.gap_character)
+            elif self.sequence_type == "rna":
+                self.alphabet = Alphabet.rna(gap_character=self.gap_character)
+            else:
+                raise ValueError(f"Unknown sequence type: {self.sequence_type}")
+
+            self.alphabet_size = self.alphabet.size
 
         # If max_length not specified, determine from data
         if self.max_length is None and self.pad_sequences:
-            self.max_length = max(len(seq) for seq in sequences)
+            if self.alphabet.delimiter is not None:
+                # For delimited sequences, count tokens not characters
+                self.max_length = max(
+                    len(self.alphabet.tokenize(seq)) for seq in sequences
+                )
+            else:
+                self.max_length = max(len(seq) for seq in sequences)
 
         return self
 
@@ -124,15 +140,7 @@ class OneHotEmbedder:
 
         processed = []
         for seq in sequences:
-            if len(seq) > self.max_length:
-                # Truncate
-                processed.append(seq[: self.max_length])
-            elif len(seq) < self.max_length:
-                # Pad with gap character
-                padding = self.gap_character * (self.max_length - len(seq))
-                processed.append(seq + padding)
-            else:
-                processed.append(seq)
+            processed.append(self.alphabet.pad_sequence(seq, self.max_length))
 
         return processed
 
@@ -142,20 +150,24 @@ class OneHotEmbedder:
         :param sequence: Sequence to encode
         :return: Flattened one-hot encoding
         """
-        sequence = sequence.upper()
+        # Tokenize the sequence
+        tokens = self.alphabet.tokenize(sequence)
 
-        # Create matrix of zeros
-        encoding = np.zeros((len(sequence), self.alphabet_size))
+        # Create matrix of zeros (tokens × alphabet size)
+        encoding = np.zeros((len(tokens), self.alphabet.size))
 
         # Fill in one-hot values
-        for i, char in enumerate(sequence):
-            if char in self.alphabet:
-                j = self.alphabet.index(char)
-                encoding[i, j] = 1
-            elif char == self.gap_character:
-                # Special handling for gap character if not explicitly in alphabet
-                j = self.alphabet.index(self.gap_character)
-                encoding[i, j] = 1
+        for i, token in enumerate(tokens):
+            idx = self.alphabet.token_to_idx.get(token, -1)
+            if idx >= 0:
+                encoding[i, idx] = 1
+            elif token == self.alphabet.gap_character:
+                # Special handling for gap character
+                gap_idx = self.alphabet.token_to_idx.get(
+                    self.alphabet.gap_character, -1
+                )
+                if gap_idx >= 0:
+                    encoding[i, gap_idx] = 1
 
         # Flatten to a vector
         return encoding.flatten()
