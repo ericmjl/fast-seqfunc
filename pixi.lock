@@ -4230,8 +4230,8 @@ packages:
   timestamp: 1730967050578
 - pypi: .
   name: fast-seqfunc
-  version: 0.0.1
-  sha256: aa490f1f2feb32abd05966cbc1614dc75c6310089ccc1aa696b6dd54f9921c03
+  version: 0.0.2
+  sha256: b9bc893ccffc7ecbc83750f61f339624df81e0ffd3404f6dfa1da8aa117a5baf
   requires_dist:
   - typer>=0.9.0
   - numpy>=1.22.0
