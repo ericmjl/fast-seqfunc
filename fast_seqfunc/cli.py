@@ -21,6 +21,7 @@ from fast_seqfunc.core import (
     evaluate_model,
     load_model,
     predict,
+    save_detailed_metrics,
     save_model,
     train_model,
 )
@@ -43,22 +44,36 @@ def train(
     model_type: str = typer.Option(
         "regression", help="Model type: regression or classification"
     ),
-    output_path: Path = typer.Option(
-        Path("model.pkl"), help="Path to save trained model"
+    output_dir: Path = typer.Option(
+        Path("outputs"), help="Directory for all outputs (model, metrics, cache)"
     ),
-    cache_dir: Optional[Path] = typer.Option(
-        None, help="Directory to cache embeddings"
+    model_filename: str = typer.Option(
+        "model.pkl", help="Filename for the saved model within the output directory"
     ),
 ):
     """Train a sequence-function model on protein or nucleotide sequences."""
     logger.info(f"Training model using {embedding_method} embeddings...")
+
+    # Create the output directory and its subdirectories
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create subdirectories for metrics and cache
+    metrics_dir = output_dir / "metrics"
+    metrics_dir.mkdir(exist_ok=True)
+
+    cache_dir = output_dir / "cache"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Model path will be in the main output directory
+    model_path = output_dir / model_filename
 
     # Parse embedding methods if multiple are provided
     if "," in embedding_method:
         embedding_method = [m.strip() for m in embedding_method.split(",")]
 
     # Train the model
-    model = train_model(
+    model_info = train_model(
         train_data=train_data,
         val_data=val_data,
         test_data=test_data,
@@ -69,9 +84,185 @@ def train(
         cache_dir=cache_dir,
     )
 
+    # Get the PyCaret model
+    model = model_info["model"]
+
+    # If test data was provided, we'll have test results to save
+    test_results = model_info.get("test_results")
+
+    # Save detailed metrics if test results are available
+    if test_results:
+        # If embedding_method is a list, convert it to a string for filenames
+        embedding_str = embedding_method
+        if isinstance(embedding_method, list):
+            embedding_str = "_".join(embedding_method)
+
+        # Process test results and generate metrics
+        _save_test_metrics(test_results, metrics_dir, model_type, embedding_str, model)
+
     # Save the trained model
-    save_model(model, output_path)
-    logger.info(f"Model saved to {output_path}")
+    save_model(model_info, model_path)
+    logger.info(f"Model saved to {model_path}")
+
+    # Create and save summary information
+    _save_model_summary(
+        output_dir, model_path, metrics_dir, cache_dir, embedding_method, model_type
+    )
+
+    # Clean up any leftover PNG files
+    _cleanup_png_files()
+
+    logger.info(f"All outputs saved to {output_dir}")
+
+
+def _save_model_summary(
+    output_dir: Path,
+    model_path: Path,
+    metrics_dir: Path,
+    cache_dir: Path,
+    embedding_method: str,
+    model_type: str,
+) -> None:
+    """Create and save a summary of model information.
+
+    :param output_dir: Directory for all outputs
+    :param model_path: Path to the saved model
+    :param metrics_dir: Directory for metrics
+    :param cache_dir: Directory for cache files
+    :param embedding_method: Method used for embedding
+    :param model_type: Type of model (regression or classification)
+    """
+    # Save a summary of the output locations
+    summary = {
+        "model_path": str(model_path),
+        "metrics_dir": str(metrics_dir),
+        "cache_dir": str(cache_dir),
+        "embedding_method": embedding_method,
+        "model_type": model_type,
+        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    # Save summary as JSON
+    with open(output_dir / "summary.json", "w") as f:
+        import json
+
+        json.dump(summary, f, indent=2)
+
+
+def _save_test_metrics(
+    test_results: Dict[str, Any],
+    metrics_dir: Path,
+    model_type: str,
+    embedding_str: str,
+    model: Any,
+) -> None:
+    """Save detailed metrics and generate plots for test results.
+
+    :param test_results: Test results from model evaluation
+    :param metrics_dir: Directory to save metrics
+    :param model_type: Type of model (regression or classification)
+    :param embedding_str: String representation of embedding method
+    :param model: Trained model
+    """
+    logger.info(f"Saving detailed performance metrics to {metrics_dir}")
+
+    # Save detailed metrics using our custom function
+    save_detailed_metrics(
+        metrics_data=test_results,
+        output_dir=metrics_dir,
+        model_type=model_type,
+        embedding_method=embedding_str,
+    )
+
+    # Generate plots using PyCaret
+    _generate_model_plots(model, model_type, metrics_dir, embedding_str)
+
+    # Try to save HTML performance report
+    _save_performance_html(model_type, metrics_dir, embedding_str)
+
+
+def _generate_model_plots(
+    model: Any,
+    model_type: str,
+    metrics_dir: Path,
+    embedding_str: str,
+) -> None:
+    """Generate and save performance plots for the model.
+
+    :param model: The trained model
+    :param model_type: Type of model (regression or classification)
+    :param metrics_dir: Directory to save metrics and plots
+    :param embedding_str: String representation of embedding method
+    """
+    try:
+        plot_types = []
+        if model_type == "regression":
+            from pycaret.regression import plot_model
+
+            plot_types = [
+                "residuals",
+                "error",
+                "feature",
+                "cooks",
+                "learning",
+                "vc",
+                "manifold",
+            ]
+        else:  # classification
+            from pycaret.classification import plot_model
+
+            plot_types = [
+                "auc",
+                "confusion_matrix",
+                "boundary",
+                "pr",
+                "class_report",
+                "feature",
+                "learning",
+                "manifold",
+            ]
+
+        for plot_type in plot_types:
+            try:
+                logger.info(f"Generating {plot_type} plot...")
+                # In PyCaret 3.0, plot_model with save=True returns a string path
+                # to the saved file or a figure object depending on the PyCaret version
+                result = plot_model(
+                    model,
+                    plot=plot_type,
+                    save=True,
+                    verbose=False,
+                )
+                _handle_plot_result(result, plot_type, metrics_dir, embedding_str)
+            except Exception as e:
+                logger.warning(f"Failed to generate {plot_type} plot: {e}")
+    except Exception as e:
+        logger.warning(f"Error generating PyCaret plots: {e}")
+
+
+def _save_performance_html(
+    model_type: str,
+    metrics_dir: Path,
+    embedding_str: str,
+) -> None:
+    """Save a detailed HTML performance report.
+
+    :param model_type: Type of model (regression or classification)
+    :param metrics_dir: Directory to save metrics
+    :param embedding_str: String representation of embedding method
+    """
+    try:
+        if model_type == "regression":
+            from pycaret.regression import pull
+        else:  # classification
+            from pycaret.classification import pull
+
+        performance_html = metrics_dir / f"{embedding_str}_performance.html"
+        with open(performance_html, "w") as f:
+            f.write(pull().to_html())
+        logger.info(f"Saved performance HTML report to {performance_html}")
+    except Exception as e:
+        logger.warning(f"Failed to generate HTML report: {e}")
 
 
 @app.command()
@@ -81,13 +272,24 @@ def predict_cmd(
         ..., help="Path to CSV file with sequences to predict"
     ),
     sequence_col: str = typer.Option("sequence", help="Column name for sequences"),
-    output_path: Path = typer.Option(
-        Path("predictions.csv"), help="Path to save predictions"
+    output_dir: Path = typer.Option(
+        Path("prediction_outputs"), help="Directory to save prediction results"
+    ),
+    predictions_filename: str = typer.Option(
+        "predictions.csv",
+        help="Filename for predictions CSV within the output directory",
     ),
 ):
     """Generate predictions for new sequences using a trained model."""
     logger.info(f"Loading model from {model_path}...")
     model_info = load_model(model_path)
+
+    # Create the output directory
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Path for predictions file
+    predictions_path = output_dir / predictions_filename
 
     # Load input data
     logger.info(f"Loading sequences from {input_data}...")
@@ -114,8 +316,175 @@ def predict_cmd(
     )
 
     # Save to CSV
-    result_df.to_csv(output_path, index=False)
-    logger.info(f"Predictions saved to {output_path}")
+    result_df.to_csv(predictions_path, index=False)
+    logger.info(f"Predictions saved to {predictions_path}")
+
+    # Try to create a histogram of predictions if numerical
+    try:
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        # Only create histogram for numerical predictions
+        if np.issubdtype(predictions.dtype, np.number):
+            plt.figure(figsize=(10, 6))
+            plt.hist(predictions, bins=30, alpha=0.7)
+            plt.xlabel("Predicted Values")
+            plt.ylabel("Frequency")
+            plt.title("Distribution of Predictions")
+            plt.savefig(output_dir / "predictions_histogram.png")
+            plt.close()
+            logger.info(
+                f"Saved predictions histogram to "
+                f"{output_dir / 'predictions_histogram.png'}"
+            )
+    except Exception as e:
+        logger.warning(f"Could not create prediction histogram: {e}")
+
+    # Save a summary of the prediction
+    summary = {
+        "model_path": str(model_path),
+        "input_data": str(input_data),
+        "predictions_file": str(predictions_path),
+        "sequence_count": len(data),
+        "model_type": model_info.get("model_type", "unknown"),
+        "embedding_method": str(model_info.get("embedding_method", "unknown")),
+        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    # Save summary as JSON
+    with open(output_dir / "prediction_summary.json", "w") as f:
+        import json
+
+        json.dump(summary, f, indent=2)
+
+    logger.info(f"All prediction outputs saved to {output_dir}")
+
+
+def _handle_plot_result(
+    result,
+    plot_type: str,
+    output_dir: Path,
+    method_name: str,
+) -> None:
+    """Handle the result of calling plot_model, which could be a string path or figure
+    object.
+
+    :param result: Result from plot_model call (could be str, figure object, or None)
+    :param plot_type: The type of plot being generated
+    :param output_dir: Directory to save the plot
+    :param method_name: Name of the embedding method for the filename
+    """
+    import os
+    import shutil
+
+    if result is None:
+        logger.warning(f"No result returned for {plot_type} plot")
+        return
+
+    if isinstance(result, str):
+        # If a string is returned, it's the path to the saved file
+        source_file = result
+
+        # If the path doesn't exist but the file might be in the current directory
+        if not os.path.exists(source_file):
+            # PyCaret 3.0 may generate files with names like "-N Residuals.png"
+            possible_files = [
+                f
+                for f in os.listdir()
+                if f.endswith(".png")
+                and (
+                    plot_type.lower() in f.lower()
+                    or plot_type.lower().replace("_", " ") in f.lower()
+                )
+            ]
+            if possible_files:
+                source_file = possible_files[0]
+
+        if os.path.exists(source_file):
+            destination_file = output_dir / f"{method_name}_{plot_type}.png"
+            shutil.move(source_file, destination_file)
+            logger.info(
+                f"Moved {plot_type} plot from {source_file} to {destination_file}"
+            )
+        else:
+            logger.warning(f"Could not find saved {plot_type} plot file")
+
+    elif hasattr(result, "figure_"):
+        # If a figure object is returned, save it directly
+        save_path = output_dir / f"{method_name}_{plot_type}.png"
+        try:
+            result.figure_.savefig(save_path)
+            logger.info(f"Saved {plot_type} plot to {save_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save {plot_type} plot: {e}")
+
+
+def _cleanup_png_files() -> None:
+    """Clean up any leftover PNG files in the root directory."""
+    try:
+        import glob
+        import os
+
+        # Find all PNG files in the current directory
+        png_files = glob.glob("*.png")
+        for png_file in png_files:
+            # Only remove files with PyCaret-style naming
+            # like "-N Feature Importance.png"
+            if png_file.startswith("-") or "plot" in png_file.lower():
+                logger.info(f"Cleaning up leftover file: {png_file}")
+                os.remove(png_file)
+    except Exception as e:
+        logger.warning(f"Error cleaning up PNG files: {e}")
+
+
+def _create_comparison_plot(
+    results_df: pd.DataFrame, model_type: str, output_dir: Path
+) -> None:
+    """Create a comparison plot for multiple embedding methods.
+
+    :param results_df: DataFrame with metrics for different embedding methods
+    :param model_type: Type of model (regression or classification)
+    :param output_dir: Directory to save the plot
+    """
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        # Set up the figure
+        plt.figure(figsize=(12, 8))
+
+        # For each metric, create a grouped bar chart
+        if model_type == "regression":
+            metrics_to_plot = ["r2", "rmse", "mae"]
+        else:  # classification
+            metrics_to_plot = ["accuracy", "f1", "precision", "recall"]
+
+        # Filter to just include metrics we have
+        available_metrics = [m for m in metrics_to_plot if m in results_df.columns]
+
+        if available_metrics:
+            # Melt the dataframe to get it in the right format for seaborn
+            melted_df = pd.melt(
+                results_df,
+                id_vars=["embedding_method"],
+                value_vars=available_metrics,
+                var_name="Metric",
+                value_name="Value",
+            )
+
+            # Create the plot
+            sns.barplot(x="Metric", y="Value", hue="embedding_method", data=melted_df)
+            plt.title(f"Comparison of Embedding Methods ({model_type})")
+            plt.ylabel("Score")
+            plt.tight_layout()
+
+            # Save the figure
+            comparison_plot_path = output_dir / "embedding_comparison_plot.png"
+            plt.savefig(comparison_plot_path)
+            plt.close()
+            logger.info(f"Saved embedding comparison plot to {comparison_plot_path}")
+    except Exception as e:
+        logger.warning(f"Failed to create comparison plot: {e}")
 
 
 @app.command()
@@ -132,19 +501,37 @@ def compare_embeddings(
     model_type: str = typer.Option(
         "regression", help="Model type: regression or classification"
     ),
-    output_path: Path = typer.Option(
-        Path("embedding_comparison.csv"), help="Path to save comparison results"
-    ),
-    cache_dir: Optional[Path] = typer.Option(
-        None, help="Directory to cache embeddings"
+    output_dir: Path = typer.Option(
+        Path("comparison_outputs"),
+        help="Directory for all outputs (results, metrics, models, cache)",
     ),
 ):
     """Compare different embedding methods on the same dataset."""
     logger.info("Comparing embedding methods...")
 
+    # Create the output directory and its subdirectories
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create subdirectories
+    metrics_dir = output_dir / "metrics"
+    metrics_dir.mkdir(exist_ok=True)
+
+    models_dir = output_dir / "models"
+    models_dir.mkdir(exist_ok=True)
+
+    cache_dir = output_dir / "cache"
+    cache_dir.mkdir(exist_ok=True)
+
+    # Results file path
+    results_file = output_dir / "embedding_comparison.csv"
+
     # List of embedding methods to compare
     embedding_methods = ["one-hot", "carp", "esm2"]
     results = []
+
+    # Dictionary to store model info for each method
+    models_info = {}
 
     # Train models with each embedding method
     for method in embedding_methods:
@@ -163,27 +550,53 @@ def compare_embeddings(
                 cache_dir=cache_dir,
             )
 
+            # Save the model
+            model_path = models_dir / f"{method}_model.pkl"
+            save_model(model_info, model_path)
+            logger.info(f"Saved {method} model to {model_path}")
+
+            # Store model info for later reference
+            models_info[method] = model_info
+
             # Evaluate on test data if provided
-            if test_data:
-                test_df = pd.read_csv(test_data)
+            if not test_data:
+                continue
 
-                # Extract model components
-                model = model_info["model"]
-                embedder = model_info["embedder"]
-                embed_cols = model_info["embed_cols"]
+            test_df = pd.read_csv(test_data)
 
-                metrics = evaluate_model(
-                    model=model,
-                    X_test=test_df[sequence_col],
-                    y_test=test_df[target_col],
-                    embedder=embedder,
-                    model_type=model_type,
-                    embed_cols=embed_cols,
-                )
+            # Extract model components
+            model = model_info["model"]
+            embedder = model_info["embedder"]
+            embed_cols = model_info["embed_cols"]
 
-                # Add method and metrics to results
-                result = {"embedding_method": method, **metrics}
-                results.append(result)
+            # Get full test results
+            test_results = evaluate_model(
+                model=model,
+                X_test=test_df[sequence_col],
+                y_test=test_df[target_col],
+                embedder=embedder,
+                model_type=model_type,
+                embed_cols=embed_cols,
+            )
+
+            # Save detailed metrics
+            logger.info(f"Saving detailed metrics for {method} embedding")
+
+            # Save detailed metrics using our custom function
+            save_detailed_metrics(
+                metrics_data=test_results,
+                output_dir=metrics_dir,
+                model_type=model_type,
+                embedding_method=method,
+            )
+
+            # Generate plots for this model
+            _generate_plots(model, model_type, metrics_dir, method)
+
+            # Add method and metrics to results for the comparison table
+            result = {"embedding_method": method, **test_results.get("metrics", {})}
+            results.append(result)
+
         except Exception as e:
             logger.error(f"Error training with {method}: {e}")
 
@@ -191,8 +604,34 @@ def compare_embeddings(
     results_df = pd.DataFrame(results)
 
     # Save to CSV
-    results_df.to_csv(output_path, index=False)
-    logger.info(f"Comparison results saved to {output_path}")
+    results_df.to_csv(results_file, index=False)
+    logger.info(f"Comparison results saved to {results_file}")
+
+    # Create comparison plots if we have metrics for multiple methods
+    if len(results) > 1:
+        _create_comparison_plot(results_df, model_type, output_dir)
+
+    # Save a summary of the output locations
+    summary = {
+        "results_file": str(results_file),
+        "metrics_dir": str(metrics_dir),
+        "models_dir": str(models_dir),
+        "cache_dir": str(cache_dir),
+        "embedding_methods": embedding_methods,
+        "model_type": model_type,
+        "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    # Save summary as JSON
+    with open(output_dir / "summary.json", "w") as f:
+        import json
+
+        json.dump(summary, f, indent=2)
+
+    # Clean up any leftover PNG files
+    _cleanup_png_files()
+
+    logger.info(f"All outputs saved to {output_dir}")
 
 
 @app.command()
@@ -541,6 +980,43 @@ def list_synthetic_tasks():
     typer.echo("")
     typer.echo("For detailed options:")
     typer.echo("  fast-seqfunc generate-synthetic --help")
+
+
+def _generate_plots(model, model_type: str, metrics_dir: Path, method: str) -> None:
+    """Generate and save performance plots for a model.
+
+    :param model: The trained model
+    :param model_type: Type of model (regression or classification)
+    :param metrics_dir: Directory to save metrics and plots
+    :param method: Name of the embedding method
+    """
+    try:
+        plot_types = []
+        if model_type == "regression":
+            from pycaret.regression import plot_model
+
+            plot_types = ["residuals", "error", "feature", "cooks", "learning"]
+        else:  # classification
+            from pycaret.classification import plot_model
+
+            plot_types = ["auc", "confusion_matrix", "boundary", "pr", "class_report"]
+
+        for plot_type in plot_types:
+            try:
+                logger.info(f"Generating {plot_type} plot for {method}...")
+                # In PyCaret 3.0, plot_model with save=True returns a string path
+                # to the saved file or a figure object depending on the PyCaret version
+                result = plot_model(
+                    model,
+                    plot=plot_type,
+                    save=True,
+                    verbose=False,
+                )
+                _handle_plot_result(result, plot_type, metrics_dir, method)
+            except Exception as e:
+                logger.warning(f"Failed to generate {plot_type} plot for {method}: {e}")
+    except Exception as e:
+        logger.warning(f"Error generating PyCaret plots for {method}: {e}")
 
 
 if __name__ == "__main__":

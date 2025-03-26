@@ -240,7 +240,7 @@ def evaluate_model(
     embedder: Any,
     model_type: str,
     embed_cols: List[str],
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """Evaluate model performance on test data.
 
     :param model: Trained model
@@ -249,7 +249,14 @@ def evaluate_model(
     :param embedder: Embedder to transform sequences
     :param model_type: Type of model (regression or classification)
     :param embed_cols: Column names for embedded features
-    :return: Dictionary of performance metrics
+    :return: Dictionary containing metrics and prediction data with structure:
+             {
+                "metrics": {metric_name: value, ...},
+                "predictions_data": {
+                    "y_true": [...],
+                    "y_pred": [...]
+                }
+             }
     """
     # Embed test sequences
     X_test_embedded = embedder.transform(X_test)
@@ -258,7 +265,15 @@ def evaluate_model(
     # Make predictions
     if model_type == "regression":
         from pycaret.regression import predict_model
-        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+        from sklearn.metrics import (
+            explained_variance_score,
+            max_error,
+            mean_absolute_error,
+            mean_absolute_percentage_error,
+            mean_squared_error,
+            median_absolute_error,
+            r2_score,
+        )
 
         # Get predictions
         preds = predict_model(model, data=X_test_df)
@@ -270,7 +285,16 @@ def evaluate_model(
             "r2": r2_score(y_test, y_pred),
             "rmse": np.sqrt(mean_squared_error(y_test, y_pred)),
             "mae": mean_absolute_error(y_test, y_pred),
+            "explained_variance": explained_variance_score(y_test, y_pred),
+            "max_error": max_error(y_test, y_pred),
+            "median_absolute_error": median_absolute_error(y_test, y_pred),
         }
+
+        # Try to compute MAPE, but handle potential division by zero
+        try:
+            metrics["mape"] = mean_absolute_percentage_error(y_test, y_pred)
+        except Exception:
+            metrics["mape"] = np.nan
 
     else:  # classification
         from pycaret.classification import predict_model
@@ -279,6 +303,7 @@ def evaluate_model(
             f1_score,
             precision_score,
             recall_score,
+            roc_auc_score,
         )
 
         # Get predictions
@@ -290,6 +315,9 @@ def evaluate_model(
         ][0]
         y_pred = preds[pred_col].values
 
+        # Get probability predictions if available
+        proba_columns = [col for col in preds.columns if "probability" in col.lower()]
+
         # Calculate metrics
         metrics = {
             "accuracy": accuracy_score(y_test, y_pred),
@@ -298,7 +326,29 @@ def evaluate_model(
             "recall": recall_score(y_test, y_pred, average="weighted"),
         }
 
-    return metrics
+        # Try to calculate ROC AUC if binary classification
+        try:
+            # If there are probability columns, try to use them for ROC AUC
+            if proba_columns and len(np.unique(y_test)) == 2:
+                proba_values = preds[proba_columns[0]].values
+                metrics["roc_auc"] = roc_auc_score(y_test, proba_values)
+            # Otherwise, try to calculate ROC AUC from predictions
+            elif len(np.unique(y_test)) == 2:
+                metrics["roc_auc"] = roc_auc_score(y_test, y_pred)
+        except Exception:
+            metrics["roc_auc"] = np.nan
+
+    # Save raw predictions and targets for later analysis
+    predictions_data = {
+        "y_true": y_test,
+        "y_pred": y_pred,
+    }
+
+    # Return both metrics and raw data
+    return {
+        "metrics": metrics,
+        "predictions_data": predictions_data,
+    }
 
 
 def save_model(model_info: Dict[str, Any], path: Union[str, Path]) -> None:
@@ -366,3 +416,87 @@ def _load_data(
         raise ValueError(f"Target column '{target_col}' not found in data")
 
     return df
+
+
+def save_detailed_metrics(
+    metrics_data: Dict[str, Any],
+    output_dir: Path,
+    model_type: str,
+    embedding_method: str = "unknown",
+) -> None:
+    """Save detailed model metrics to files in the specified directory.
+
+    :param metrics_data: Dictionary containing metrics and prediction data
+    :param output_dir: Directory to save metrics files
+    :param model_type: Type of model (regression or classification)
+    :param embedding_method: Embedding method used for this model
+    """
+    import json
+
+    from matplotlib import pyplot as plt
+    from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+
+    # Ensure output directory exists
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Extract data
+    metrics = metrics_data.get("metrics", {})
+    predictions_data = metrics_data.get("predictions_data", {})
+    y_true = predictions_data.get("y_true", [])
+    y_pred = predictions_data.get("y_pred", [])
+
+    # Save metrics to JSON file
+    metrics_file = output_dir / f"{embedding_method}_metrics.json"
+    with open(metrics_file, "w") as f:
+        json.dump(metrics, f, indent=2)
+
+    # Save raw predictions to CSV
+    predictions_df = pd.DataFrame(
+        {
+            "true_value": y_true,
+            "prediction": y_pred,
+        }
+    )
+    predictions_file = output_dir / f"{embedding_method}_predictions.csv"
+    predictions_df.to_csv(predictions_file, index=False)
+
+    # Create visualizations based on model type
+    if model_type == "regression":
+        # Scatter plot of predicted vs actual values
+        plt.figure(figsize=(10, 6))
+        plt.scatter(y_true, y_pred, alpha=0.5)
+        min_val = min(min(y_true), min(y_pred))
+        max_val = max(max(y_true), max(y_pred))
+        plt.plot([min_val, max_val], [min_val, max_val], "r--")
+        plt.xlabel("True Values")
+        plt.ylabel("Predictions")
+        plt.title(f"True vs Predicted Values - {embedding_method}")
+        plt.savefig(output_dir / f"{embedding_method}_scatter_plot.png")
+        plt.close()
+
+        # Residual plot
+        residuals = y_true - y_pred
+        plt.figure(figsize=(10, 6))
+        plt.scatter(y_pred, residuals, alpha=0.5)
+        plt.axhline(y=0, color="r", linestyle="--")
+        plt.xlabel("Predicted Values")
+        plt.ylabel("Residuals")
+        plt.title(f"Residual Plot - {embedding_method}")
+        plt.savefig(output_dir / f"{embedding_method}_residual_plot.png")
+        plt.close()
+
+    else:  # classification
+        # Confusion matrix
+        try:
+            cm = confusion_matrix(y_true, y_pred)
+            plt.figure(figsize=(10, 8))
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+            disp.plot(cmap="Blues")
+            plt.title(f"Confusion Matrix - {embedding_method}")
+            plt.savefig(output_dir / f"{embedding_method}_confusion_matrix.png")
+            plt.close()
+        except Exception as e:
+            logger.warning(f"Could not create confusion matrix: {e}")
+
+    logger.info(f"Detailed metrics saved to {output_dir}")
