@@ -49,6 +49,8 @@ jobs:
 
           # Run tests and capture the output for analysis
           pixi run -e tests -- pytest -m "$MARKER" --cov --cov-report=xml:$COVERAGE_FILE --cov-report=term-missing -v | tee pytest_output.txt
+          # Store the exit code of pytest
+          PYTEST_EXIT_CODE=${PIPESTATUS[0]}
 
           # Extract test counts from the last line of output which has format like:
           # "67 passed, 3 skipped, 8 deselected in 2.17s"
@@ -67,6 +69,15 @@ jobs:
           echo "passed=$PASSED" >> $GITHUB_OUTPUT
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+
+          # Exit with the pytest exit code to properly indicate test failure
+          exit $PYTEST_EXIT_CODE
+
+      - name: Check for test failures
+        if: steps.run-tests.outputs.failed != '0'
+        run: |
+          echo "::error::${{ steps.run-tests.outputs.failed }} tests failed!"
+          exit 1
 
       - name: Create test summary
         if: always()
