@@ -86,7 +86,6 @@ jobs:
       - name: Write release notes
         if: github.event_name != 'pull_request'
         env:
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           uv tool install llamabot[cli]
