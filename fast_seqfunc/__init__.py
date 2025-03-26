@@ -1,50 +1,28 @@
-"""Top-level API for fast-seqfunc.
+"""Fast-seqfunc: A library for training sequence-function models.
 
-This is the file from which you can do:
-
-    from fast_seqfunc import train_model, predict, save_model, load_model
-
-Provides a simple interface for sequence-function modeling of proteins and nucleotides.
+This library provides tools for embedding biological sequences and training
+machine learning models to predict functions from sequence data.
 """
 
-from fast_seqfunc.core import (
-    evaluate_model,
-    load_model,
-    predict,
-    save_model,
-    train_model,
-)
-
-# Import synthetic data generation functions
+from fast_seqfunc.alphabets import Alphabet, infer_alphabet
+from fast_seqfunc.core import predict, train_model
+from fast_seqfunc.embedders import OneHotEmbedder, get_embedder
 from fast_seqfunc.synthetic import (
-    create_classification_task,
-    create_g_count_task,
-    create_gc_content_task,
-    create_interaction_task,
-    create_length_dependent_task,
-    create_motif_count_task,
-    create_motif_position_task,
-    create_multiclass_task,
-    create_nonlinear_composition_task,
-    generate_dataset_by_task,
+    generate_integer_function_data,
+    generate_integer_sequences,
+    generate_random_sequences,
+    generate_sequence_function_data,
 )
 
 __all__ = [
-    # Core functionality
     "train_model",
     "predict",
-    "save_model",
-    "load_model",
-    "evaluate_model",
-    # Synthetic data
-    "create_g_count_task",
-    "create_gc_content_task",
-    "create_motif_position_task",
-    "create_motif_count_task",
-    "create_length_dependent_task",
-    "create_nonlinear_composition_task",
-    "create_interaction_task",
-    "create_classification_task",
-    "create_multiclass_task",
-    "generate_dataset_by_task",
+    "get_embedder",
+    "OneHotEmbedder",
+    "Alphabet",
+    "infer_alphabet",
+    "generate_random_sequences",
+    "generate_integer_sequences",
+    "generate_sequence_function_data",
+    "generate_integer_function_data",
 ]
