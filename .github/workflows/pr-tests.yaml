@@ -5,11 +5,19 @@ on:
     paths:
       - 'fast_seqfunc/**/*.py'
       - 'tests/**/*.py'
+      - 'pyproject.toml'
+      - '.github/workflows/*.yaml'
 
 jobs:
   run-tests:
     runs-on: ubuntu-latest
-    name: Run test suite
+    name: Tests (${{ matrix.test-type }})
+    timeout-minutes: ${{ matrix.test-type == 'slow' && 45 || 15 }}
+
+    strategy:
+      matrix:
+        test-type: ['fast', 'slow']
+      fail-fast: false # Allow other tests to continue if one fails
 
     # https://github.com/marketplace/actions/setup-miniconda#use-a-default-shell
     defaults:
@@ -25,14 +33,84 @@ jobs:
           cache: true
           environments: tests
 
-      - name: Run tests
+      - name: Run fast tests
+        if: matrix.test-type == 'fast'
+        id: fast-tests
         run: |
-          pixi run test
+          # Run tests and capture output and exit code
+          set +e
+          TEST_OUTPUT=$(pixi run -e tests -- pytest -m "not slow" --cov --cov-report=xml:coverage-fast.xml --cov-report=term-missing -v)
+          TEST_EXIT_CODE=$?
+          set -e
+
+          # Count test results
+          PASSED=$(echo "$TEST_OUTPUT" | grep -o "passed" | wc -l)
+          FAILED=$(echo "$TEST_OUTPUT" | grep -o "failed" | wc -l)
+          SKIPPED=$(echo "$TEST_OUTPUT" | grep -o "skipped" | wc -l)
+
+          # Set outputs for summary
+          echo "exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+
+          # Display test output
+          echo "$TEST_OUTPUT"
+
+          # Properly exit if tests failed
+          exit $TEST_EXIT_CODE
+
+      - name: Run slow tests
+        if: matrix.test-type == 'slow'
+        id: slow-tests
+        run: |
+          # Run tests and capture output and exit code
+          set +e
+          TEST_OUTPUT=$(pixi run -e tests -- pytest -m "slow" --cov --cov-report=xml:coverage-slow.xml --cov-report=term-missing -v)
+          TEST_EXIT_CODE=$?
+          set -e
+
+          # Count test results
+          PASSED=$(echo "$TEST_OUTPUT" | grep -o "passed" | wc -l)
+          FAILED=$(echo "$TEST_OUTPUT" | grep -o "failed" | wc -l)
+          SKIPPED=$(echo "$TEST_OUTPUT" | grep -o "skipped" | wc -l)
+
+          # Set outputs for summary
+          echo "exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+
+          # Display test output
+          echo "$TEST_OUTPUT"
+
+          # Properly exit if tests failed
+          exit $TEST_EXIT_CODE
+
+      - name: Create test summary
+        if: always()
+        run: |
+          echo "## ${{ matrix.test-type }} Test Results 🧪" >> $GITHUB_STEP_SUMMARY
+
+          if [[ '${{ matrix.test-type }}' == 'fast' ]]; then
+            echo "- ✅ Passed: ${{ steps.fast-tests.outputs.passed || 0 }}" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ Failed: ${{ steps.fast-tests.outputs.failed || 0 }}" >> $GITHUB_STEP_SUMMARY
+            echo "- ⏩ Skipped: ${{ steps.fast-tests.outputs.skipped || 0 }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Exit Code: ${{ steps.fast-tests.outputs.exit_code || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ✅ Passed: ${{ steps.slow-tests.outputs.passed || 0 }}" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ Failed: ${{ steps.slow-tests.outputs.failed || 0 }}" >> $GITHUB_STEP_SUMMARY
+            echo "- ⏩ Skipped: ${{ steps.slow-tests.outputs.skipped || 0 }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Exit Code: ${{ steps.slow-tests.outputs.exit_code || 'N/A' }}" >> $GITHUB_STEP_SUMMARY
+          fi
 
       # https://github.com/codecov/codecov-action
       - name: Upload code coverage
+        if: success() || failure() # Run this step even if tests fail
         uses: codecov/codecov-action@v2
         with:
+          # flag the upload with the test type to separate them in codecov
+          flags: ${{ matrix.test-type }}
           # fail_ci_if_error: true # optional (default = false)
           verbose: true # optional (default = false)
 
@@ -41,7 +119,8 @@ jobs:
   # are defined completely.
   bare-install:
     runs-on: ubuntu-latest
-    name: Run bare installation test
+    name: Bare installation
+    timeout-minutes: 5
 
     strategy:
       matrix:

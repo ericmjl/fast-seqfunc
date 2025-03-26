@@ -47,6 +47,9 @@ addopts = "-v --cov --cov-report term-missing --durations=10"
 testpaths = [
     "tests",
 ]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.isort]
 profile = "black"
