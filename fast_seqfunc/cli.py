@@ -650,9 +650,15 @@ def describe():
 def generate_synthetic(
     task: str = typer.Argument(
         ...,
-        help="Type of synthetic data task to generate. Options: g_count, gc_content, "
-        "motif_position, motif_count, length_dependent, nonlinear_composition, "
-        "interaction, classification, multiclass",
+        help="Type of synthetic data task to generate. Options: "
+        # Biological sequence tasks
+        "g_count, gc_content, motif_position, motif_count, length_dependent, "
+        "nonlinear_composition, interaction, classification, multiclass, "
+        # Integer sequence tasks
+        "integer_sum, integer_token_count, integer_max, integer_pattern, "
+        "integer_pattern_position, integer_nonlinear, integer_nonlinear_composition, "
+        "integer_interaction, integer_position_interaction, integer_classification, "
+        "integer_multiclass, integer_ratio, integer_pattern_count",
     ),
     output_dir: Path = typer.Option(
         Path("synthetic_data"), help="Directory to save generated datasets"
@@ -681,7 +687,7 @@ def generate_synthetic(
     ),
     noise_level: float = typer.Option(0.1, help="Level of noise to add to the data"),
     sequence_type: str = typer.Option(
-        "dna", help="Type of sequences to generate: dna, rna, or protein"
+        "dna", help="Type of sequences to generate: dna, rna, protein, or integer"
     ),
     alphabet: Optional[str] = typer.Option(
         None, help="Custom alphabet for sequences. Overrides sequence_type if provided."
@@ -694,6 +700,31 @@ def generate_synthetic(
     ),
     weights: Optional[str] = typer.Option(
         None, help="Comma-separated list of weights for motif_count task"
+    ),
+    max_integer: int = typer.Option(
+        9, help="Maximum integer value for integer sequence tasks (inclusive)"
+    ),
+    integer_pattern: Optional[str] = typer.Option(
+        None, help="Comma-separated pattern of integers for integer_pattern task"
+    ),
+    integer_delimiter: str = typer.Option(",", help="Delimiter for integer sequences"),
+    token: Optional[str] = typer.Option(
+        None, help="Token to count for integer_token_count task"
+    ),
+    numerator_tokens: Optional[str] = typer.Option(
+        None, help="Comma-separated list of tokens for numerator in integer_ratio task"
+    ),
+    denominator_tokens: Optional[str] = typer.Option(
+        None,
+        help="Comma-separated list of tokens for denominator in integer_ratio task",
+    ),
+    interaction_pairs: Optional[str] = typer.Option(
+        None,
+        help="Comma-separated list of token pairs for interaction tasks "
+        "(format: 'token1:token2:weight')",
+    ),
+    gap: int = typer.Option(
+        2, help="Gap between interacting positions for interaction tasks"
     ),
     prefix: str = typer.Option("", help="Prefix for output filenames"),
     random_seed: Optional[int] = typer.Option(
@@ -708,6 +739,7 @@ def generate_synthetic(
 
     Each task produces a different type of sequence-function relationship:
 
+    Biological sequence tasks:
     - g_count: Linear relationship based on count of G nucleotides
     - gc_content: Linear relationship based on GC content
     - motif_position: Function depends on the position of a motif (nonlinear)
@@ -718,15 +750,52 @@ def generate_synthetic(
     - classification: Binary classification based on presence of motifs
     - multiclass: Multi-class classification based on different patterns
 
+    Integer sequence tasks:
+    - integer_sum: Counts the sum of all integers in the sequence
+      (alias: integer_token_count).
+    - integer_token_count: Alias for integer_sum - counts occurrences of a specific
+      integer token.
+    - integer_max: Returns the maximum integer value in the sequence.
+    - integer_pattern: Older version of integer_pattern_position - function depends on
+      position of a pattern.
+    - integer_pattern_position: Function depends on the position of a specific integer
+      pattern.
+    - integer_nonlinear: Older version of integer_nonlinear_composition - nonlinear
+      relationship based on squared values.
+    - integer_nonlinear_composition: Nonlinear function based on frequencies of specific
+      integers.
+    - integer_interaction: Older version of integer_position_interaction - interactions
+      between adjacent integers.
+    - integer_position_interaction: Captures interactions between non-adjacent integers
+      with specific gap.
+    - integer_classification: Binary classification task based on median value of
+      integers.
+    - integer_multiclass: Multi-class classification task based on average value of
+      integers.
+    - integer_ratio: Calculates the ratio of high-value integers (5-9) to the total
+      count.
+    - integer_pattern_count: Counts occurrences of multiple integer patterns with
+      weighted contributions.
+
     Example usage:
 
-    $ fast-seqfunc generate-synthetic gc_content --output-dir data/gc_task
+    $ fast-seqfunc generate-synthetic g_count --output-dir data/g_count_task
 
     $ fast-seqfunc generate-synthetic motif_position --motif ATCG --noise-level 0.2
 
     $ fast-seqfunc generate-synthetic classification \
         --sequence-type protein \
         --no-split-data
+
+    $ fast-seqfunc generate-synthetic integer_sum \
+        --sequence-type integer \
+        --sequence-length 5 \
+        --max-integer 9
+
+    $ fast-seqfunc generate-synthetic integer_pattern_position \
+        --sequence-type integer \
+        --integer-pattern 1,2,3 \
+        --sequence-length 5
     """
     # Set random seed if provided
     if random_seed is not None:
@@ -738,6 +807,9 @@ def generate_synthetic(
     # Create output directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Check if we're using integer sequences
+    is_integer_task = task.startswith("integer_")
+
     # Set alphabet based on sequence type
     if alphabet is None:
         sequence_type = sequence_type.lower()
@@ -747,13 +819,27 @@ def generate_synthetic(
             alphabet = "ACGU"
         elif sequence_type == "protein":
             alphabet = "ACDEFGHIKLMNPQRSTVWY"
+        elif sequence_type == "integer":
+            # For integer tasks, we use the Alphabet.integer factory method
+            # We just need a placeholder here since we'll handle this specially
+            alphabet = "integer"
         else:
             logger.warning(
                 f"Unknown sequence type: {sequence_type}. Using DNA alphabet."
             )
             alphabet = "ACGT"
 
-    logger.info(f"Using alphabet: {alphabet}")
+    logger.info(f"Using sequence type: {sequence_type}")
+
+    # For integer tasks, use appropriate defaults
+    if is_integer_task or sequence_type == "integer":
+        if sequence_length > 10:
+            logger.warning(
+                f"Integer sequences with length > 10 may cause computation or "
+                f"memory issues. Using default length of 5 instead of "
+                f"{sequence_length}."
+            )
+            sequence_length = 5
 
     # Task-specific parameters
     task_params: Dict[str, Any] = {}
@@ -765,6 +851,7 @@ def generate_synthetic(
     # We need to patch the generate_random_sequences function to use our alphabet
     # This approach uses monkey patching to avoid having to modify all task functions
     original_generate_random_sequences = synthetic.generate_random_sequences
+    original_generate_integer_sequences = synthetic.generate_integer_sequences
 
     def patched_generate_random_sequences(*args, **kwargs):
         """
@@ -777,10 +864,26 @@ def generate_synthetic(
         :param kwargs: Keyword arguments to pass to the original function
         :return: Result from the original generate_random_sequences function
         """
-        # Override the alphabet parameter with our custom alphabet,
-        # but keep other parameters
-        kwargs["alphabet"] = alphabet
-        return original_generate_random_sequences(*args, **kwargs)
+        # For integer tasks, we need to use generate_integer_sequences instead
+        if is_integer_task or sequence_type == "integer":
+            # Convert standard parameters to match what
+            # generate_integer_sequences expects
+            int_kwargs = kwargs.copy()
+
+            # Override the specific parameters for integer sequences
+            int_kwargs["max_value"] = max_integer
+            int_kwargs["delimiter"] = integer_delimiter
+
+            # Remove alphabet parameter which isn't used by generate_integer_sequences
+            if "alphabet" in int_kwargs:
+                del int_kwargs["alphabet"]
+
+            return original_generate_integer_sequences(*args, **int_kwargs)
+        else:
+            # Override the alphabet parameter with our custom alphabet,
+            # but keep other parameters
+            kwargs["alphabet"] = alphabet
+            return original_generate_random_sequences(*args, **kwargs)
 
     # Replace the function temporarily
     synthetic.generate_random_sequences = patched_generate_random_sequences
@@ -838,8 +941,95 @@ def generate_synthetic(
         task_params["min_length"] = min_length
         task_params["max_length"] = max_length
 
+    elif task == "integer_pattern" or task == "integer_pattern_position":
+        # Add max_value parameter for integer tasks
+        task_params["max_value"] = max_integer
+
+        # Parse custom integer pattern if provided
+        if integer_pattern:
+            try:
+                pattern_values = [
+                    int(val.strip()) for val in integer_pattern.split(",")
+                ]
+                task_params["pattern"] = pattern_values
+                logger.info(f"Using custom integer pattern: {pattern_values}")
+            except ValueError:
+                logger.warning(
+                    "Invalid integer pattern. Using default pattern [1, 2, 3]."
+                )
+                task_params["pattern"] = [1, 2, 3]
+        else:
+            task_params["pattern"] = [1, 2, 3]
+            logger.info("Using default integer pattern: [1, 2, 3]")
+
+    elif task == "integer_pattern_count":
+        # Add max_value parameter for integer tasks
+        task_params["max_value"] = max_integer
+
+        # Parse custom patterns and weights if provided
+        if motifs:
+            task_params["patterns"] = [m.strip() for m in motifs.split(",")]
+
+        if weights:
+            try:
+                weight_values = [float(w.strip()) for w in weights.split(",")]
+                task_params["weights"] = weight_values
+            except ValueError:
+                logger.warning("Invalid weight values. Using default weights.")
+
+    elif task == "integer_token_count":
+        # Add max_value parameter
+        task_params["max_value"] = max_integer
+
+        # Set token to count if provided
+        if token:
+            task_params["token"] = token
+
+    elif task == "integer_ratio":
+        # Add max_value parameter
+        task_params["max_value"] = max_integer
+
+        # Parse numerator and denominator tokens if provided
+        if numerator_tokens:
+            task_params["numerator_tokens"] = [
+                t.strip() for t in numerator_tokens.split(",")
+            ]
+
+        if denominator_tokens:
+            task_params["denominator_tokens"] = [
+                t.strip() for t in denominator_tokens.split(",")
+            ]
+
+    elif task == "integer_position_interaction" or task == "integer_interaction":
+        # Add max_value parameter
+        task_params["max_value"] = max_integer
+
+        # Set gap between interacting positions
+        task_params["gap"] = gap
+
+        # Parse interaction pairs if provided
+        if interaction_pairs:
+            try:
+                # Format expected: "token1:token2:weight,token3:token4:weight"
+                pairs = []
+                for pair_str in interaction_pairs.split(","):
+                    parts = pair_str.split(":")
+                    if len(parts) == 3:
+                        t1, t2, w = parts
+                        pairs.append((t1.strip(), t2.strip(), float(w.strip())))
+
+                if pairs:
+                    task_params["interaction_pairs"] = pairs
+            except (ValueError, IndexError):
+                logger.warning("Invalid interaction pairs format. Using default pairs.")
+
+    elif is_integer_task:
+        # Add max_value parameter for all other integer tasks
+        task_params["max_value"] = max_integer
+
     # Validate the task
     valid_tasks = [
+        # Biological sequence tasks
         "g_count",
         "gc_content",
         "motif_position",
@@ -849,6 +1039,20 @@ def generate_synthetic(
         "interaction",
         "classification",
         "multiclass",
+        # Integer sequence tasks
+        "integer_sum",
+        "integer_max",
+        "integer_pattern",
+        "integer_nonlinear",
+        "integer_interaction",
+        "integer_classification",
+        "integer_multiclass",
+        "integer_token_count",
+        "integer_ratio",
+        "integer_pattern_position",
+        "integer_pattern_count",
+        "integer_nonlinear_composition",
+        "integer_position_interaction",
     ]
 
     if task not in valid_tasks:
@@ -945,6 +1149,7 @@ def generate_synthetic(
 def list_synthetic_tasks():
     """List all available synthetic sequence-function data tasks with descriptions."""
     tasks = {
+        # Biological sequence tasks
         "g_count": "A simple linear task where the function value is the count of G "
         "nucleotides in the sequence.",
         "gc_content": "A simple linear task where the function value is the GC content "
@@ -956,7 +1161,7 @@ def list_synthetic_tasks():
         "length_dependent": "A task with variable-length sequences where the function "
         "value depends nonlinearly on the sequence length.",
         "nonlinear_composition": "A complex nonlinear task where the function depends "
-        "on ratios between different nucleotide frequencies.",
+        "on nonlinear combinations of nucleotide frequencies.",
         "interaction": "A task testing positional interactions, "
         "where specific nucleotide pairs at certain positions "
         "contribute to the function.",
@@ -965,17 +1170,95 @@ def list_synthetic_tasks():
         "multiclass": "A multi-class classification task "
         "with multiple sequence patterns "
         "corresponding to different classes.",
+        # Integer sequence tasks
+        # Basic integer tasks
+        "integer_sum": "Counts the sum of all integers in the sequence.",
+        "integer_token_count": "Counts occurrences of a specific integer token.",
+        "integer_max": "Returns the maximum integer value in the sequence.",
+        "integer_ratio": "Calculates the ratio of high-value integers (5-9) "
+        "to the total count.",
+        "integer_pattern": "Older version of integer_pattern_position - "
+        "function depends on position of a pattern.",
+        "integer_pattern_position": "Function depends on the position of a "
+        "specific integer pattern.",
+        "integer_pattern_count": "Counts occurrences of multiple integer patterns "
+        "with weighted contributions.",
+        # Advanced integer tasks
+        "integer_nonlinear": "Older version of integer_nonlinear_composition - "
+        "nonlinear relationship based on squared values.",
+        "integer_nonlinear_composition": "Nonlinear function based on frequencies "
+        "of specific integers.",
+        "integer_interaction": "Older version of integer_position_interaction - "
+        "interactions between adjacent integers.",
+        "integer_position_interaction": "Captures interactions between non-adjacent "
+        "integers with specific gap.",
+        "integer_classification": "Binary classification task based on median "
+        "value of integers.",
+        "integer_multiclass": "Multi-class classification task based on average "
+        "value of integers.",
     }
 
-    typer.echo("Available synthetic sequence-function data tasks:")
-    typer.echo("")
+    typer.echo("\n=== Available Synthetic Sequence-Function Tasks ===\n")
 
-    for task, description in tasks.items():
-        typer.echo(f"{task}:")
+    # Group tasks by category
+    bio_tasks = {k: v for k, v in tasks.items() if not k.startswith("integer_")}
+
+    # Split integer tasks into original and new generalized tasks
+    original_int_tasks = {
+        k: v
+        for k, v in tasks.items()
+        if k
+        in [
+            "integer_sum",
+            "integer_max",
+            "integer_pattern",
+            "integer_nonlinear",
+            "integer_interaction",
+            "integer_classification",
+            "integer_multiclass",
+        ]
+    }
+
+    generalized_int_tasks = {
+        k: v
+        for k, v in tasks.items()
+        if k
+        in [
+            "integer_token_count",
+            "integer_ratio",
+            "integer_pattern_position",
+            "integer_pattern_count",
+            "integer_nonlinear_composition",
+            "integer_position_interaction",
+        ]
+    }
+
+    # Print biological sequence tasks
+    typer.echo("\033[1mBiological Sequence Tasks:\033[0m")
+    typer.echo("-------------------------")
+    for task, description in bio_tasks.items():
+        typer.echo(f"\033[1m{task}\033[0m:")
         typer.echo(f"  {description}")
         typer.echo("")
 
-    typer.echo("Usage:")
+    # Print original integer tasks
+    typer.echo("\033[1mOriginal Integer Sequence Tasks:\033[0m")
+    typer.echo("-----------------------------")
+    for task, description in original_int_tasks.items():
+        typer.echo(f"\033[1m{task}\033[0m:")
+        typer.echo(f"  {description}")
+        typer.echo("")
+
+    # Print generalized integer tasks
+    typer.echo("\033[1mGeneralized Integer Sequence Tasks:\033[0m")
+    typer.echo("--------------------------------")
+    for task, description in generalized_int_tasks.items():
+        typer.echo(f"\033[1m{task}\033[0m:")
+        typer.echo(f"  {description}")
+        typer.echo("")
+
+    # Print usage information
+    typer.echo("\033[1mUsage:\033[0m")
     typer.echo("  fast-seqfunc generate-synthetic TASK [OPTIONS]")
     typer.echo("")
     typer.echo("For detailed options:")
