@@ -73,22 +73,24 @@ def test_gc_content_task():
 
 def test_motif_position_task():
     """Test motif position task generation."""
-    motif = "GATA"
-    df = create_motif_position_task(count=20, length=30, motif=motif, noise_level=0.0)
+    pattern = "GATA"
+    df = create_motif_position_task(
+        count=20, length=30, pattern=pattern, noise_level=0.0
+    )
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 20
 
     # Check that some sequences contain the motif
-    assert any(motif in seq for seq in df["sequence"])
+    assert any(pattern in seq for seq in df["sequence"])
 
 
 def test_motif_count_task():
     """Test motif count task generation."""
-    motifs = ["AT", "GC"]
+    patterns = ["AT", "GC"]
     weights = [1.0, 2.0]
     df = create_motif_count_task(
-        count=10, length=30, motifs=motifs, weights=weights, noise_level=0.0
+        count=10, length=30, patterns=patterns, weights=weights, noise_level=0.0
     )
 
     assert isinstance(df, pd.DataFrame)
@@ -97,8 +99,8 @@ def test_motif_count_task():
     # Without noise, function should match weighted count
     for i, row in df.iterrows():
         expected = (
-            row["sequence"].count(motifs[0]) * weights[0]
-            + row["sequence"].count(motifs[1]) * weights[1]
+            row["sequence"].count(patterns[0]) * weights[0]
+            + row["sequence"].count(patterns[1]) * weights[1]
         )
         assert row["function"] == expected
 

@@ -809,7 +809,7 @@ create_gc_content_task = partial(
 create_motif_position_task = partial(
     create_pattern_position_task,
     alphabet="ACGT",
-    pattern="GATA",
+    pattern="GATA",  # Default pattern
     length=50,
 )
 
@@ -817,8 +817,8 @@ create_motif_position_task = partial(
 create_motif_count_task = partial(
     create_pattern_count_task,
     alphabet="ACGT",
-    patterns=["AT", "GC", "TG", "CA"],
-    weights=[1.0, -0.5, 2.0, -1.5],
+    patterns=["AT", "GC", "TG", "CA"],  # Default patterns
+    weights=[1.0, -0.5, 2.0, -1.5],  # Default weights
     length=50,
 )
 
