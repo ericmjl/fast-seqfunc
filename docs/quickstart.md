@@ -145,6 +145,37 @@ The synthetic data generator can create datasets with various sequence-function 
 - Classification problems (presence/absence of patterns)
 - And many more!
 
+## Interpreting Results for Signal Detection
+
+One of the primary purposes of Fast-SeqFunc is to quickly determine if there is meaningful "signal" in your sequence-function data. Here's how to interpret your results:
+
+### Evaluating Signal Presence
+
+1. **Check performance metrics**:
+   - For regression: R², RMSE, and MAE values
+   - For classification: Accuracy, F1 score, AUC-ROC
+
+2. **Use visualizations**:
+   - Scatter plots of predicted vs. actual values
+   - Residual plots showing systematic patterns or random noise
+   - ROC curves for classification tasks
+
+3. **Benchmarks for determining signal**:
+   - Models significantly outperforming random guessing indicate signal
+   - R² values above 0.3-0.4 suggest detectable relationships
+   - AUC-ROC values above 0.6-0.7 indicate useful classification signal
+
+### Leveraging Early Signal
+
+When you detect signal:
+
+1. **Prioritize candidates**: Use model predictions to rank and select promising sequences for experimental testing
+2. **Iterate experimentally**: Test top-ranked sequences and use results to refine your model
+3. **Decide on complexity**: Strong signal warrants investment in more sophisticated models like neural networks
+4. **Compare embedding methods**: If signal is present, explore if more complex embeddings (ESM, CARP) improve performance
+
+Remember that even modest performance can be valuable for prioritizing experimental candidates and guiding exploration of sequence space.
+
 ## Next Steps
 
 After mastering the basics, you can:

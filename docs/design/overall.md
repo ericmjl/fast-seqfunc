@@ -4,12 +4,17 @@
 
 Fast-SeqFunc is a Python package designed for efficient sequence-function modeling of proteins and nucleotide sequences. It provides a simple, high-level API that handles sequence embedding methods and automates model selection and training through the PyCaret framework.
 
+The primary purpose of Fast-SeqFunc is to quickly detect whether there is meaningful "signal" in sequence-function data. By enabling rapid model development, researchers can determine early if predictive relationships exist, opportunistically use these models for ranking candidate sequences, and make informed decisions about investing in more complex modeling approaches when signal is detected.
+
 ## Design Goals
 
 1. **Simplicity**: Provide a clean, intuitive API for training sequence-function models
 2. **Flexibility**: Support multiple sequence types with custom alphabet capabilities
 3. **Automation**: Leverage PyCaret to automate model selection and hyperparameter tuning
 4. **Performance**: Enable efficient processing through lazy loading and clean architecture
+5. **Signal Detection**: Rapidly determine if predictive relationships exist in the data
+6. **Decision Support**: Help users make informed choices about modeling approaches based on signal strength
+7. **Candidate Ranking**: Enable efficient prioritization of sequences for experimental testing
 
 ## Architecture
 

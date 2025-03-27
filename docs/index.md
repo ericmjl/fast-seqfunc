@@ -30,6 +30,20 @@ pip install git+https://github.com/ericmjl/fast-seqfunc.git
 - **Regression and Classification**: Support for both continuous values and categorical outputs
 - **Comprehensive Evaluation**: Built-in metrics and visualization utilities
 
+## Why Fast-SeqFunc?
+
+The primary motivation behind Fast-SeqFunc is to quickly answer a crucial question in sequence-function modeling: **Is there detectable signal in my data?**
+
+In biological sequence-function problems, determining whether a predictive relationship exists is a critical first step before investing significant resources in complex modeling approaches. Fast-SeqFunc allows you to:
+
+1. **Rapidly detect signal**: Quickly build baseline models to determine if your sequence data contains predictive information
+2. **Make early decisions**: Identify promising directions early in your research process
+3. **Rank candidates efficiently**: Use simple but effective models to score and prioritize candidate sequences for experimental testing
+4. **Validate before scaling**: Confirm signal exists before investing time in developing more complex neural network models
+5. **Iterate strategically**: When signal is detected, use that knowledge to guide the development of more sophisticated models
+
+By providing a fast path to baseline model development, Fast-SeqFunc helps you make informed decisions about where to focus your modeling efforts.
+
 ## Basic Usage
 
 ### Command-Line Interface

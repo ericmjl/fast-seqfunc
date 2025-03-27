@@ -8,6 +8,17 @@ This document outlines the planned development path for fast-seqfunc.
 
 Support for more sequence embedding methods beyond one-hot encoding. While the CLI and core functions reference "carp" and "esm2" embedders, these are not currently implemented. Integrating with ESM2, CARP, or other pre-trained models will enhance the library's capabilities.
 
+### Signal Detection and Analysis Tools
+
+Enhance Fast-SeqFunc's primary purpose of detecting signal in sequence-function data:
+
+1. **Automated Signal Detection Reports**: Generate comprehensive reports that clearly indicate whether signal exists in the data with statistical confidence measures
+2. **Benchmark Comparisons**: Automatically compare model performance against random expectation and theoretical upper bounds
+3. **Advanced Visualization Tools**: Create specialized visualizations that highlight the presence or absence of signal in different ways
+4. **Candidate Generation Strategies**: Develop smarter approaches for generating candidate sequences when signal is detected
+5. **Signal-Guided Model Selection**: Automatically recommend more advanced modeling approaches when sufficient signal is detected
+6. **Effect Size Analysis**: Tools to estimate the magnitude of sequence effects on function
+
 ### Batch Processing for Large Datasets
 
 Implement efficient batch processing for datasets that are too large to fit in memory, especially when using more complex embedding methods that require significant computational resources.

@@ -172,6 +172,65 @@ print(f"  R²:   {r2:.4f}")
 print(f"  MAE:  {mae:.4f}")
 ```
 
+## Interpreting Signal and Making Decisions
+
+A critical purpose of Fast-SeqFunc is to determine if there's meaningful signal in your sequence-function data. Let's look at how to interpret these results and make decisions about next steps:
+
+```python
+# Define a threshold for "meaningful signal"
+r2_threshold = 0.1  # This is a modest threshold for biological data
+signal_detected = r2 > r2_threshold
+
+print(f"Signal detected in data: {signal_detected}")
+if signal_detected:
+    print("Recommendations:")
+    print("  1. Use model for candidate ranking in next experiments")
+    print("  2. Consider exploring more advanced embedding methods")
+    print(f"  3. Signal strength (R²={r2:.4f}) suggests {'strong' if r2 > 0.3 else 'moderate' if r2 > 0.1 else 'weak'} relationship")
+else:
+    print("Recommendations:")
+    print("  1. Review experiment design and data quality")
+    print("  2. Consider adding more data or different sequence features")
+    print("  3. Explore if other modeling approaches detect signal")
+```
+
+### Using Models for Candidate Ranking
+
+If you detected signal, you can use your model to rank new candidate sequences:
+
+```python
+# Generate or import candidate sequences
+import random
+from fast_seqfunc.synthetic import generate_random_sequences
+
+# Generate 1000 random candidates
+candidate_sequences = generate_random_sequences(
+    1000, length=50, alphabet_type="dna"
+)
+
+# Predict their values
+candidate_predictions = predict(model_info, candidate_sequences)
+
+# Create DataFrame for ranking
+candidates_df = pd.DataFrame({
+    "sequence": candidate_sequences,
+    "predicted_value": candidate_predictions
+})
+
+# Sort by predicted value (ascending or descending based on your goal)
+candidates_df.sort_values("predicted_value", ascending=False, inplace=True)
+
+# Select top candidates for experimental testing
+top_candidates = candidates_df.head(10)
+print("Top 10 candidates for experimental testing:")
+print(top_candidates)
+
+# Save ranked candidates
+candidates_df.to_csv(output_dir / "ranked_candidates.csv", index=False)
+```
+
+This approach allows you to prioritize which sequences to test next in your experiments, potentially saving significant time and resources.
+
 ## Visualizing Results
 
 Visualizations help in understanding model performance:
