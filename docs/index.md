@@ -32,6 +32,25 @@ pip install git+https://github.com/ericmjl/fast-seqfunc.git
 
 ## Basic Usage
 
+### Command-Line Interface
+
+Fast-SeqFunc provides a convenient command-line interface for common tasks:
+
+```bash
+# Train a model
+fast-seqfunc train train_data.csv --sequence-col sequence --target-col function --embedding-method one-hot
+
+# Make predictions with a trained model
+fast-seqfunc predict-cmd model.pkl new_sequences.csv --sequence-col sequence --output-dir predictions --predictions-filename predictions.csv
+
+# Compare different embedding methods
+fast-seqfunc compare-embeddings train_data.csv --test-data test_data.csv
+```
+
+### Python API
+
+You can also use Fast-SeqFunc programmatically in your Python code:
+
 ```python
 from fast_seqfunc import train_model, predict, save_model
 

@@ -5,25 +5,22 @@ This guide demonstrates how to use `fast-seqfunc` for training sequence-function
 ## Prerequisites
 
 - Python 3.11 or higher
-- The following packages:
-  - `fast-seqfunc`
-  - `pandas`
-  - `numpy`
-  - `matplotlib` and `seaborn` (for visualization)
-  - `pycaret[full]>=3.0.0`
-  - `scikit-learn>=1.0.0`
+- The `fast-seqfunc` package installed
 
 ## Setup
 
-Start by importing the necessary modules:
+The `fast-seqfunc` package comes with a command-line interface (CLI) that makes it easy to train models and make predictions without writing any code.
 
-```python
-from pathlib import Path
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from fast_seqfunc import train_model, predict, save_model, load_model
+To see all available commands, run:
+
+```bash
+fast-seqfunc --help
+```
+
+For help with a specific command, use:
+
+```bash
+fast-seqfunc [command] --help
 ```
 
 ## Data Preparation
@@ -37,117 +34,124 @@ TACGTACG...,0.63
 ...
 ```
 
-Let's load and split our data:
+You'll need to split your data into training and test sets. You can use any CSV file manipulation tool for this, or you can use the built-in synthetic data generator to create sample data:
 
-```python
-# Load your sequence-function data
-data = pd.read_csv("your_data.csv")
-
-# Split into train and test sets (80/20 split)
-train_size = int(0.8 * len(data))
-train_data = data[:train_size].copy()
-test_data = data[train_size:].copy()
-
-print(f"Data split: {len(train_data)} train, {len(test_data)} test samples")
-
-# Create directory for outputs
-output_dir = Path("output")
-output_dir.mkdir(parents=True, exist_ok=True)
+```bash
+# Generate synthetic regression data (DNA sequences with G count function)
+fast-seqfunc generate-synthetic g_count --output-dir data --total-count 1000 --split-data
 ```
+
+This will create `train.csv`, `val.csv`, and `test.csv` files in the `data` directory.
 
 ## Training a Model
 
-With `fast-seqfunc`, you can train a model with just a few lines of code:
+With `fast-seqfunc`, you can train a model with a single command:
 
-```python
+```bash
 # Train and compare multiple models automatically
-model_info = train_model(
-    train_data=train_data,
-    test_data=test_data,
-    sequence_col="sequence",  # Column containing sequences
-    target_col="function",    # Column containing function values
-    embedding_method="one-hot",  # Method to encode sequences
-    model_type="regression",     # For predicting continuous values
-    optimization_metric="r2",    # Optimize for R-squared
-)
+fast-seqfunc train data/train.csv \
+  --val-data data/val.csv \
+  --test-data data/test.csv \
+  --sequence-col sequence \
+  --target-col function \
+  --embedding-method one-hot \
+  --model-type regression \
+  --output-dir outputs
 
-# Display test results if available
-if model_info.get("test_results"):
-    print("\nTest metrics from training:")
-    for metric, value in model_info["test_results"].items():
-        print(f"  {metric}: {value:.4f}")
+# The model will be saved to outputs/model.pkl by default
 ```
 
-## Saving and Loading Models
+The command above will:
 
-You can easily save your trained model for later use:
-
-```python
-# Save the model
-model_path = output_dir / "model.pkl"
-save_model(model_info, model_path)
-print(f"Model saved to {model_path}")
-
-# Later, you can load the model
-loaded_model = load_model(model_path)
-```
+1. Load your training, validation, and test data
+2. Embed the sequences using one-hot encoding
+3. Train multiple regression models using PyCaret
+4. Select the best model based on performance
+5. Evaluate the model on the test data
+6. Save the model and performance metrics
 
 ## Making Predictions
 
 Making predictions on new sequences is straightforward:
 
-```python
+```bash
 # Make predictions on test data
-predictions = predict(model_info, test_data["sequence"])
+fast-seqfunc predict-cmd outputs/model.pkl data/test.csv \
+  --sequence-col sequence \
+  --output-dir prediction_outputs \
+  --predictions-filename predictions.csv
 
-# Create a results DataFrame
-results_df = test_data.copy()
-results_df["prediction"] = predictions
-results_df.to_csv(output_dir / "predictions.csv", index=False)
+# Results will be saved to prediction_outputs/predictions.csv
+# A histogram of predictions will be generated (if applicable)
 ```
 
-## Evaluating Model Performance
+This command will:
 
-You can evaluate how well your model performs:
+1. Load your trained model
+2. Load the sequences from your test data
+3. Generate predictions for each sequence
+4. Save the results to a CSV file with both the original sequences and the predictions
 
-```python
-# Calculate metrics manually
-true_values = test_data["function"]
-mse = ((predictions - true_values) ** 2).mean()
-r2 = 1 - ((predictions - true_values) ** 2).sum() / ((true_values - true_values.mean()) ** 2).sum()
+## Comparing Embedding Methods
 
-print("Model performance:")
-print(f"  Mean Squared Error: {mse:.4f}")
-print(f"  R²: {r2:.4f}")
+You can also compare different embedding methods to see which works best for your data:
+
+```bash
+# Compare different embedding methods on the same dataset
+fast-seqfunc compare-embeddings data/train.csv \
+  --test-data data/test.csv \
+  --sequence-col sequence \
+  --target-col function \
+  --model-type regression \
+  --output-dir comparison_outputs
+
+# Results will be saved to comparison_outputs/embedding_comparison.csv
+# Individual models will be saved in comparison_outputs/models/
 ```
 
-## Visualizing Results
+This command will:
 
-Visualizing the model's performance can provide insights:
+1. Train models using different embedding methods (one-hot, and others if available)
+2. Evaluate each model on the test data
+3. Compare the performance metrics
+4. Save the results and models
 
-```python
-# Create a scatter plot of true vs predicted values
-plt.figure(figsize=(8, 6))
-sns.scatterplot(x=true_values, y=predictions, alpha=0.6)
-plt.plot(
-    [min(true_values), max(true_values)],
-    [min(true_values), max(true_values)],
-    "r--"  # Add a diagonal line
-)
-plt.xlabel("True Function Value")
-plt.ylabel("Predicted Function Value")
-plt.title("True vs Predicted Function Values")
-plt.tight_layout()
-plt.savefig(output_dir / "true_vs_predicted.png", dpi=300)
+## Generating Synthetic Data
+
+Fast-SeqFunc includes a powerful synthetic data generator for different sequence-function relationships:
+
+```bash
+# See available synthetic data tasks
+fast-seqfunc list-synthetic-tasks
+
+# Generate data for a specific task
+fast-seqfunc generate-synthetic motif_position \
+  --sequence-type dna \
+  --motif ATCG \
+  --noise-level 0.2 \
+  --output-dir data/motif_task
+
+# Generate classification data
+fast-seqfunc generate-synthetic classification \
+  --sequence-type protein \
+  --output-dir data/classification_task
 ```
+
+The synthetic data generator can create datasets with various sequence-function relationships, including:
+
+- Linear relationships (G count, GC content)
+- Position-dependent functions (motif position)
+- Nonlinear relationships (length-dependent functions)
+- Classification problems (presence/absence of patterns)
+- And many more!
 
 ## Next Steps
 
 After mastering the basics, you can:
 
 1. Try different embedding methods (currently only `one-hot` is supported, with more coming soon)
-2. Experiment with classification problems by setting `model_type="classification"`
-3. Optimize for different metrics by changing the `optimization_metric` parameter
-4. Explore the internal model structure and customize it for your specific needs
+2. Experiment with classification problems by setting `--model-type classification`
+3. Generate different types of synthetic data to benchmark your approach
+4. Explore the Python API for more advanced customization
 
 For more details, check out the [API documentation](api_reference.md).
