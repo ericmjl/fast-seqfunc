@@ -6,14 +6,14 @@ Made with ❤️ by Eric Ma (@ericmjl).
 
 ## Overview
 
-Fast-SeqFunc is a Python package designed for efficient sequence-function modeling for proteins and nucleotide machine learning problems. It provides a simple, high-level API that handles various sequence embedding methods and automates model selection and training.
+Fast-SeqFunc is a Python package designed for efficient sequence-function modeling for proteins and nucleotide machine learning problems. It provides a simple, high-level API that handles sequence embedding methods and automates model selection and training.
 
 ### Key Features
 
 - **Multiple Embedding Methods**:
-  - One-hot encoding
-  - CARP (Microsoft's protein-sequence-models)
-  - ESM2 (Facebook's ESM)
+  - One-hot encoding (currently implemented)
+  - CARP (Microsoft's protein-sequence-models) - planned for future releases
+  - ESM2 (Facebook's ESM) - planned for future releases
 
 - **Automated Machine Learning**:
   - Uses PyCaret for model selection and hyperparameter tuning
@@ -60,15 +60,15 @@ import pandas as pd
 
 # Load your sequence-function data
 train_data = pd.read_csv("train_data.csv")
-val_data = pd.read_csv("val_data.csv")
+test_data = pd.read_csv("test_data.csv")
 
 # Train a model
 model = train_model(
     train_data=train_data,
-    val_data=val_data,
+    test_data=test_data,
     sequence_col="sequence",
     target_col="function",
-    embedding_method="one-hot",  # or "carp", "esm2", "auto"
+    embedding_method="one-hot",  # currently the only implemented method
     model_type="regression",     # or "classification"
 )
 
@@ -107,12 +107,12 @@ fast-seqfunc compare-embeddings train_data.csv --test-data test_data.csv --outpu
 
 ### Using Multiple Embedding Methods
 
-You can try multiple embedding methods in one run:
+Currently, only one-hot encoding is implemented. Support for multiple embedding methods is planned for future releases.
 
 ```python
 model = train_model(
     train_data=train_data,
-    embedding_method=["one-hot", "carp", "esm2"],
+    embedding_method="one-hot",
 )
 ```
 
@@ -151,12 +151,8 @@ comparison_outputs/
 ├── summary.json                  # Summary of output locations and parameters
 ├── models/                       # Saved models for each method
 │   ├── one-hot_model.pkl
-│   ├── carp_model.pkl
-│   └── esm2_model.pkl
 ├── metrics/                      # Performance metrics for each method
 │   ├── one-hot_metrics.json
-│   ├── carp_metrics.json
-│   └── ...
 └── cache/                        # Cached embeddings
 ```
 
