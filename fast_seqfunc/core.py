@@ -654,30 +654,38 @@ def save_detailed_metrics(
 
     # Create visualizations based on model type
     if model_type == "regression":
-        # Scatter plot of predicted vs actual values
-        plt.figure(figsize=(10, 6))
-        plt.scatter(y_true, y_pred, alpha=0.5)
-        min_val = min(min(y_true), min(y_pred))
-        max_val = max(max(y_true), max(y_pred))
-        plt.plot([min_val, max_val], [min_val, max_val], "r--")
-        plt.xlabel("True Values")
-        plt.ylabel("Predictions")
-        plt.title(f"True vs Predicted Values - {embedding_method}")
-        plt.savefig(output_dir / f"{embedding_method}_scatter_plot.png")
-        plt.close()
+        # Only proceed with visualizations if we have data
+        if len(y_true) > 0 and len(y_pred) > 0:
+            # Scatter plot of predicted vs actual values
+            plt.figure(figsize=(10, 6))
+            plt.scatter(y_true, y_pred, alpha=0.5)
 
-        # Residual plot
-        residuals = y_true - y_pred
-        plt.figure(figsize=(10, 6))
-        plt.scatter(y_pred, residuals, alpha=0.5)
-        plt.axhline(y=0, color="r", linestyle="--")
-        plt.xlabel("Predicted Values")
-        plt.ylabel("Residuals")
-        plt.title(f"Residual Plot - {embedding_method}")
-        plt.savefig(output_dir / f"{embedding_method}_residual_plot.png")
-        plt.close()
+            # Safe calculation of min and max values
+            min_val = min(min(y_true), min(y_pred))
+            max_val = max(max(y_true), max(y_pred))
+            plt.plot([min_val, max_val], [min_val, max_val], "r--")
+            plt.xlabel("True Values")
+            plt.ylabel("Predictions")
+            plt.title(f"True vs Predicted Values - {embedding_method}")
+            plt.savefig(output_dir / f"{embedding_method}_scatter_plot.png")
+            plt.close()
 
-    else:  # classification
+            # Residual plot
+            residuals = y_true - y_pred
+            plt.figure(figsize=(10, 6))
+            plt.scatter(y_pred, residuals, alpha=0.5)
+            plt.axhline(y=0, color="r", linestyle="--")
+            plt.xlabel("Predicted Values")
+            plt.ylabel("Residuals")
+            plt.title(f"Residual Plot - {embedding_method}")
+            plt.savefig(output_dir / f"{embedding_method}_residual_plot.png")
+            plt.close()
+        else:
+            logger.warning(
+                f"Skipping visualization for {embedding_method}: Empty prediction data"
+            )
+
+    elif len(y_true) > 0 and len(y_pred) > 0:  # classification with data
         # Confusion matrix
         try:
             cm = confusion_matrix(y_true, y_pred)
@@ -689,6 +697,10 @@ def save_detailed_metrics(
             plt.close()
         except Exception as e:
             logger.warning(f"Could not create confusion matrix: {e}")
+    else:
+        logger.warning(
+            f"Skipping visualization for {embedding_method}: Empty prediction data"
+        )
 
     logger.info(f"Detailed metrics saved to {output_dir}")
 
