@@ -5,7 +5,7 @@ machine learning models to predict functions from sequence data.
 """
 
 from fast_seqfunc.alphabets import Alphabet, infer_alphabet
-from fast_seqfunc.core import predict, train_model
+from fast_seqfunc.core import predict, save_model, train_model
 from fast_seqfunc.embedders import OneHotEmbedder, get_embedder
 from fast_seqfunc.synthetic import (
     create_content_ratio_task,
@@ -79,4 +79,5 @@ __all__ = [
     "create_integer_interaction_task",
     "create_integer_classification_task",
     "create_integer_multiclass_task",
+    "save_model",
 ]
