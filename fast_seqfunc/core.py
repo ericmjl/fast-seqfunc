@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from fast_seqfunc.embedders import get_embedder
@@ -151,10 +152,47 @@ def train_model(
             if optimization_metric:
                 compare_args["sort"] = optimization_metric
 
-            models = compare_models(**compare_args)
+            # Check if the dataset is extremely small (3 samples or fewer)
+            # In this case, bypass compare_models entirely and use create_model
+            if len(train_processed) <= 3:
+                logger.warning(
+                    f"Extremely small training dataset detected ({len(train_processed)} samples). "  # noqa: E501
+                    "Bypassing model comparison and directly creating a simple model."
+                )
+                from pycaret.regression import create_model
+
+                # Use a simple ridge regression which can work with tiny datasets
+                models = create_model("ridge", cross_validation=False)
+            # Check if the dataset is very small (less than 10 samples)
+            # PyCaret struggles with cross-validation on tiny datasets
+            elif len(train_processed) < 10:
+                logger.warning(
+                    f"Very small training dataset detected ({len(train_processed)} samples). "  # noqa: E501
+                    "Disabling cross-validation and using simpler models."
+                )
+                compare_args["cross_validation"] = False
+                compare_args["include"] = ["lr", "ridge", "lasso", "dt", "knn"]
+                # Try to train models
+                models = compare_models(**compare_args)
+            else:
+                # For normal-sized datasets, use the standard approach
+                models = compare_models(**compare_args)
 
             # Finalize model (train on all data)
             logger.info("Finalizing best model...")
+
+            # Check if models is empty and provide a fallback model
+            if not models:
+                logger.warning(
+                    "No models returned by compare_models, using fallback model"
+                )
+                models = RandomForestRegressor(random_state=_session_id)
+
+                # Fit the fallback model directly
+                models.fit(
+                    train_processed.drop("target", axis=1), train_processed["target"]
+                )
+
             final_model = finalize_model(models)
 
         elif model_type == "classification":
@@ -184,10 +222,47 @@ def train_model(
             if optimization_metric:
                 compare_args["sort"] = optimization_metric
 
-            models = compare_models(**compare_args)
+            # Check if the dataset is extremely small (3 samples or fewer)
+            # In this case, bypass compare_models entirely and use create_model
+            if len(train_processed) <= 3:
+                logger.warning(
+                    f"Extremely small training dataset detected ({len(train_processed)} samples). "  # noqa: E501
+                    "Bypassing model comparison and directly creating a simple model."
+                )
+                from pycaret.classification import create_model
+
+                # Use a simple logistic regression which can work with tiny datasets
+                models = create_model("lr", cross_validation=False)
+            # Check if the dataset is very small (less than 10 samples)
+            # PyCaret struggles with cross-validation on tiny datasets
+            elif len(train_processed) < 10:
+                logger.warning(
+                    f"Very small training dataset detected ({len(train_processed)} samples). "  # noqa: E501
+                    "Disabling cross-validation and using simpler models."
+                )
+                compare_args["cross_validation"] = False
+                compare_args["include"] = ["lr", "lda", "qda", "dt", "knn"]
+                # Try to train models
+                models = compare_models(**compare_args)
+            else:
+                # For normal-sized datasets, use the standard approach
+                models = compare_models(**compare_args)
 
             # Finalize model (train on all data)
             logger.info("Finalizing best model...")
+
+            # Check if models is empty and provide a fallback model
+            if not models:
+                logger.warning(
+                    "No models returned by compare_models, using fallback model"
+                )
+                models = RandomForestClassifier(random_state=_session_id)
+
+                # Fit the fallback model directly
+                models.fit(
+                    train_processed.drop("target", axis=1), train_processed["target"]
+                )
+
             final_model = finalize_model(models)
 
         else:

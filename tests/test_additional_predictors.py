@@ -15,6 +15,7 @@ from fast_seqfunc.core import (
     save_model,
     train_model,
 )
+from fast_seqfunc.synthetic import generate_dataset_with_predictors
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -41,6 +42,21 @@ def sequence_data_with_predictors():
             "categorical_pred": ["A", "B", "A", "B"],
             "function": [0.5, 0.6, 0.7, 0.8],
         }
+    )
+    return data
+
+
+@pytest.fixture
+def larger_sequence_data_with_predictors():
+    """Create larger test dataset with synthetic data generator."""
+    # Use the synthetic data generator to create a dataset with 100 samples
+    data = generate_dataset_with_predictors(
+        task="nonlinear_composition",  # Nonlinear regression task
+        count=100,  # 100 samples
+        noise_level=0.2,  # Add some noise
+        num_numeric_predictors=2,  # Add 2 numeric predictors
+        num_categorical_predictors=1,  # Add 1 categorical predictor
+        correlation_strength=0.7,  # Strong correlation with target
     )
     return data
 
@@ -293,3 +309,59 @@ def test_prediction_with_sequence_list_and_predictors(sequence_data_with_predict
     # Should work when passing a DataFrame with all required columns
     predictions = predict(model_info, test_data)
     assert len(predictions) == len(test_data)
+
+
+def test_train_with_larger_dataset(larger_sequence_data_with_predictors):
+    """Test training a model with a larger dataset containing additional predictors."""
+    # Use 80% of data for training, 20% for testing
+    train_size = int(len(larger_sequence_data_with_predictors) * 0.8)
+    train_data = larger_sequence_data_with_predictors.iloc[:train_size]
+    test_data = larger_sequence_data_with_predictors.iloc[train_size:]
+
+    # Get the column names from the dataset
+    numeric_cols = [col for col in train_data.columns if col.startswith("predictor")]
+    categorical_cols = [
+        col for col in train_data.columns if col.startswith("categorical_pred")
+    ]
+    predictor_cols = numeric_cols + categorical_cols
+
+    # Train model with additional predictors
+    model_info = train_model(
+        train_data=train_data,
+        test_data=test_data,
+        sequence_col="sequence",
+        target_col="function",
+        additional_predictor_cols=predictor_cols,
+        embedding_method="one-hot",
+        model_type="regression",
+    )
+
+    # Check that model_info contains additional predictor information
+    assert "additional_predictor_cols" in model_info
+    assert set(model_info["additional_predictor_cols"]) == set(predictor_cols)
+    assert "additional_predictor_preprocessing" in model_info
+
+    # Test prediction
+    predictions = predict(model_info, test_data)
+    assert len(predictions) == len(test_data)
+    assert isinstance(predictions, np.ndarray)
+
+    # Evaluate the model
+    eval_results = evaluate_model(
+        model=model_info["model"],
+        sequences=test_data["sequence"],
+        targets=test_data["function"],
+        embedder=model_info["embedder"],
+        model_type="regression",
+        embed_cols=model_info["embed_cols"],
+        additional_predictor_cols=model_info["additional_predictor_cols"],
+        additional_predictor_preprocessing=model_info[
+            "additional_predictor_preprocessing"
+        ],
+        data=test_data,
+    )
+
+    # Check that evaluation results are reasonable
+    assert "r2" in eval_results
+    assert "rmse" in eval_results
+    assert eval_results["r2"] > 0.0  # Should have at least some predictive power

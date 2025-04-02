@@ -337,11 +337,14 @@ def predict_cmd(
         ]
 
         if missing_cols:
-            logger.error(
+            error_msg = (
                 f"Missing required predictor column(s): {', '.join(missing_cols)}. "
                 f"The model was trained with these additional predictors: "
                 f"{', '.join(model_info['additional_predictor_cols'])}"
             )
+            logger.error(error_msg)
+            # Print to stdout for CLI feedback
+            print(f"Error: {error_msg}")
             raise typer.Exit(1)
 
         logger.info(
