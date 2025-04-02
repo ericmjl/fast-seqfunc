@@ -61,7 +61,7 @@ select = ["E", "F", "I"]
 
 [project]
 name = "fast-seqfunc"
-version = "0.1.1"
+version = "0.2.0"
 # NOTE: move dependencies into this section if you need to distribute the project as a Python package.
 requires-python = ">=3.10"
 dependencies = [
