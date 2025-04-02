@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import numpy as np
 import pandas as pd
 from loguru import logger
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from fast_seqfunc.embedders import get_embedder
 
@@ -24,6 +26,7 @@ def train_model(
     test_data: Optional[Union[pd.DataFrame, Path, str]] = None,
     sequence_col: str = "sequence",
     target_col: str = "function",
+    additional_predictor_cols: Optional[List[str]] = None,
     embedding_method: Literal["one-hot", "carp", "esm2"] = "one-hot",
     model_type: Literal["regression", "classification"] = "regression",
     optimization_metric: Optional[str] = None,
@@ -40,6 +43,8 @@ def train_model(
     :param test_data: Optional test data for final evaluation
     :param sequence_col: Column name containing sequences
     :param target_col: Column name containing target values
+    :param additional_predictor_cols: Optional list of column names
+        for additional predictors
     :param embedding_method: Method to use for embedding sequences
     :param model_type: Type of modeling problem (regression or classification)
     :param optimization_metric: Metric to optimize during model selection
@@ -56,7 +61,14 @@ def train_model(
         else None
     )
 
-    # Get embedder
+    # Validate additional predictor columns
+    if additional_predictor_cols:
+        _validate_additional_predictors(train_df, additional_predictor_cols)
+        if test_df is not None:
+            _validate_additional_predictors(test_df, additional_predictor_cols)
+        logger.info(f"Using additional predictor columns: {additional_predictor_cols}")
+
+    # Get embedder for sequences
     logger.info(f"Generating {embedding_method} embeddings...")
     embedder = get_embedder(embedding_method)
 
@@ -66,6 +78,46 @@ def train_model(
 
     # Create DataFrame with embeddings
     train_processed = pd.DataFrame(X_train_embedded, columns=embed_cols)
+
+    # Prepare additional predictors preprocessing pipeline
+    additional_predictor_preprocessing = None
+    if additional_predictor_cols:
+        # Process additional predictors
+        logger.info("Processing additional predictor columns...")
+        additional_predictor_preprocessing = _create_predictor_preprocessing_pipeline(
+            train_df[additional_predictor_cols]
+        )
+
+        # Transform additional predictors
+        additional_predictors_transformed = (
+            additional_predictor_preprocessing.fit_transform(
+                train_df[additional_predictor_cols]
+            )
+        )
+
+        # Convert to DataFrame if it's a sparse matrix
+        if hasattr(additional_predictors_transformed, "toarray"):
+            additional_predictors_transformed = (
+                additional_predictors_transformed.toarray()
+            )
+
+        # Add additional predictors to the training data
+        additional_cols = [
+            f"additional_{i}" for i in range(additional_predictors_transformed.shape[1])
+        ]
+        additional_predictors_df = pd.DataFrame(
+            additional_predictors_transformed, columns=additional_cols
+        )
+
+        # Combine with sequence embeddings
+        train_processed = pd.concat([train_processed, additional_predictors_df], axis=1)
+
+        logger.info(
+            f"Combined {len(embed_cols)} sequence embedding features with "
+            f"{len(additional_cols)} additional predictor features"
+        )
+
+    # Add target column to processed data
     train_processed["target"] = train_df[target_col].values
 
     # Setup PyCaret environment
@@ -154,19 +206,31 @@ def train_model(
                 embedder=embedder,
                 model_type=model_type,
                 embed_cols=embed_cols,
+                additional_predictor_cols=additional_predictor_cols,
+                additional_predictor_preprocessing=additional_predictor_preprocessing,
+                data=test_df,
             )
             logger.info(f"Test evaluation: {test_results}")
         else:
             test_results = None
 
         # Return model information
-        return {
+        model_info = {
             "model": final_model,
             "model_type": model_type,
             "embedder": embedder,
             "embed_cols": embed_cols,
             "test_results": test_results,
         }
+
+        # Add additional predictor information if used
+        if additional_predictor_cols:
+            model_info["additional_predictor_cols"] = additional_predictor_cols
+            model_info["additional_predictor_preprocessing"] = (
+                additional_predictor_preprocessing
+            )
+
+        return model_info
 
     except Exception as e:
         logger.error(f"Error during model training: {str(e)}")
@@ -185,11 +249,38 @@ def predict(
     :param sequence_col: Column name in DataFrame containing sequences
     :return: Array of predictions
     """
-    # Extract sequences if a DataFrame is provided
+    # Check if additional predictors were used in training
+    has_additional_predictors = (
+        "additional_predictor_cols" in model_info
+        and model_info["additional_predictor_cols"] is not None
+    )
+
+    # Extract sequences and additional predictors if a DataFrame is provided
     if isinstance(sequences, pd.DataFrame):
+        # Validate that the sequence column exists
         if sequence_col not in sequences.columns:
             raise ValueError(f"Column '{sequence_col}' not found in provided DataFrame")
-        sequences = sequences[sequence_col]
+
+        # Check if additional predictors are needed
+        if has_additional_predictors:
+            # Validate that all required additional predictor columns exist
+            _validate_additional_predictors(
+                sequences, model_info["additional_predictor_cols"]
+            )
+            # Keep the DataFrame for additional predictors access
+            sequences_df = sequences
+            sequences = sequences_df[sequence_col]
+        else:
+            # If no additional predictors, just extract the sequence column
+            sequences = sequences[sequence_col]
+    elif has_additional_predictors:
+        # If we have a list or Series
+        # but the model requires additional predictors, raise an error
+        raise ValueError(
+            "When using additional predictors, "
+            "sequences must be provided as a DataFrame "
+            "containing both sequence and additional predictor columns."
+        )
 
     # Extract model components
     model = model_info["model"]
@@ -198,39 +289,49 @@ def predict(
     embed_cols = model_info["embed_cols"]
 
     # Embed sequences
-    try:
-        X_embedded = embedder.transform(sequences)
-        X_df = pd.DataFrame(X_embedded, columns=embed_cols)
+    X_embedded = embedder.transform(sequences)
+    X_df = pd.DataFrame(X_embedded, columns=embed_cols)
 
-        # Use the right PyCaret function based on model type
-        if model_type == "regression":
-            from pycaret.regression import predict_model
-        else:
-            from pycaret.classification import predict_model
-
-        # Make predictions
-        predictions = predict_model(model, data=X_df)
-
-        # Extract prediction column (name varies by PyCaret version)
-        pred_cols = [
-            col
-            for col in predictions.columns
-            if any(
-                kw in col.lower() for kw in ["prediction", "predict", "label", "class"]
-            )
+    # Add additional predictors if needed
+    if has_additional_predictors:
+        additional_predictor_cols = model_info["additional_predictor_cols"]
+        additional_predictor_preprocessing = model_info[
+            "additional_predictor_preprocessing"
         ]
 
-        if not pred_cols:
-            logger.error(
-                f"Cannot identify prediction column. Columns: {predictions.columns}"
+        # Transform additional predictors
+        additional_predictors_transformed = (
+            additional_predictor_preprocessing.transform(
+                sequences_df[additional_predictor_cols]
             )
-            raise ValueError("Unable to identify prediction column in output")
+        )
 
-        return predictions[pred_cols[0]].values
+        # Convert to DataFrame if it's a sparse matrix
+        if hasattr(additional_predictors_transformed, "toarray"):
+            additional_predictors_transformed = (
+                additional_predictors_transformed.toarray()
+            )
 
-    except Exception as e:
-        logger.error(f"Error during prediction: {str(e)}")
-        raise RuntimeError(f"Failed to generate predictions: {str(e)}") from e
+        # Add additional predictors to the features
+        additional_cols = [
+            f"additional_{i}" for i in range(additional_predictors_transformed.shape[1])
+        ]
+        additional_predictors_df = pd.DataFrame(
+            additional_predictors_transformed, columns=additional_cols
+        )
+
+        # Combine with sequence embeddings
+        X_df = pd.concat([X_df, additional_predictors_df], axis=1)
+
+    # Make predictions
+    if model_type == "regression":
+        predictions = model.predict(X_df)
+    elif model_type == "classification":
+        predictions = model.predict_proba(X_df)[:, 1]  # Probability of positive class
+    else:
+        raise ValueError(f"Unsupported model_type: {model_type}")
+
+    return predictions
 
 
 def evaluate_model(
@@ -240,115 +341,130 @@ def evaluate_model(
     embedder: Any,
     model_type: str,
     embed_cols: List[str],
+    additional_predictor_cols: Optional[List[str]] = None,
+    additional_predictor_preprocessing: Optional[Any] = None,
+    data: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Any]:
     """Evaluate model performance on test data.
 
     :param model: Trained model
     :param X_test: Test sequences
     :param y_test: True target values
-    :param embedder: Embedder to transform sequences
+    :param embedder: Embedder used for sequences
     :param model_type: Type of model (regression or classification)
     :param embed_cols: Column names for embedded features
+    :param additional_predictor_cols: Optional list of column names
+        for additional predictors
+    :param additional_predictor_preprocessing: Optional preprocessing pipeline
+        for additional predictors
+    :param data: Optional DataFrame containing additional predictor columns
     :return: Dictionary containing metrics and prediction data with structure:
              {
-                "metrics": {metric_name: value, ...},
-                "predictions_data": {
-                    "y_true": [...],
-                    "y_pred": [...]
-                }
+                 "metric1": value1,
+                 "metric2": value2,
+                 ...
              }
     """
-    # Embed test sequences
+    # Embed sequences
     X_test_embedded = embedder.transform(X_test)
     X_test_df = pd.DataFrame(X_test_embedded, columns=embed_cols)
 
+    # Process additional predictors if provided
+    if (
+        additional_predictor_cols
+        and additional_predictor_preprocessing
+        and data is not None
+    ):
+        # Transform additional predictors
+        additional_predictors_transformed = (
+            additional_predictor_preprocessing.transform(
+                data[additional_predictor_cols]
+            )
+        )
+
+        # Convert to DataFrame if it's a sparse matrix
+        if hasattr(additional_predictors_transformed, "toarray"):
+            additional_predictors_transformed = (
+                additional_predictors_transformed.toarray()
+            )
+
+        # Add additional predictors to the features
+        additional_cols = [
+            f"additional_{i}" for i in range(additional_predictors_transformed.shape[1])
+        ]
+        additional_predictors_df = pd.DataFrame(
+            additional_predictors_transformed, columns=additional_cols
+        )
+
+        # Combine with sequence embeddings
+        X_test_df = pd.concat([X_test_df, additional_predictors_df], axis=1)
+
     # Make predictions
     if model_type == "regression":
-        from pycaret.regression import predict_model
-        from sklearn.metrics import (
-            explained_variance_score,
-            max_error,
-            mean_absolute_error,
-            mean_absolute_percentage_error,
-            mean_squared_error,
-            median_absolute_error,
-            r2_score,
+        y_pred = model.predict(X_test_df)
+        metrics = _evaluate_regression(y_test, y_pred)
+    elif model_type == "classification":
+        y_pred_proba = model.predict_proba(X_test_df)[:, 1]
+        y_pred_class = model.predict(X_test_df)
+        metrics = _evaluate_classification(y_test, y_pred_proba, y_pred_class)
+    else:
+        raise ValueError(f"Unsupported model_type: {model_type}")
+
+    return metrics
+
+
+def _validate_additional_predictors(
+    data: pd.DataFrame, predictor_cols: List[str]
+) -> None:
+    """Validate that all required additional predictor columns exist in the data.
+
+    :param data: DataFrame to validate
+    :param predictor_cols: List of required predictor column names
+    :raises ValueError: If a required predictor column is missing
+    """
+    missing_cols = [col for col in predictor_cols if col not in data.columns]
+    if missing_cols:
+        raise ValueError(
+            f"Missing required predictor column(s): {', '.join(missing_cols)}. "
+            f"Available columns: {', '.join(data.columns)}"
         )
 
-        # Get predictions
-        preds = predict_model(model, data=X_test_df)
-        pred_col = [col for col in preds.columns if "prediction" in col.lower()][0]
-        y_pred = preds[pred_col].values
 
-        # Calculate metrics
-        metrics = {
-            "r2": r2_score(y_test, y_pred),
-            "rmse": np.sqrt(mean_squared_error(y_test, y_pred)),
-            "mae": mean_absolute_error(y_test, y_pred),
-            "explained_variance": explained_variance_score(y_test, y_pred),
-            "max_error": max_error(y_test, y_pred),
-            "median_absolute_error": median_absolute_error(y_test, y_pred),
-        }
+def _create_predictor_preprocessing_pipeline(data: pd.DataFrame) -> ColumnTransformer:
+    """Create a preprocessing pipeline for additional predictor columns.
 
-        # Try to compute MAPE, but handle potential division by zero
-        try:
-            metrics["mape"] = mean_absolute_percentage_error(y_test, y_pred)
-        except Exception:
-            metrics["mape"] = np.nan
+    This function creates a preprocessing pipeline that handles:
+    - Numerical features: StandardScaler
+    - Categorical features: OneHotEncoder
 
-    else:  # classification
-        from pycaret.classification import predict_model
-        from sklearn.metrics import (
-            accuracy_score,
-            f1_score,
-            precision_score,
-            recall_score,
-            roc_auc_score,
-        )
+    :param data: DataFrame containing predictor columns
+    :return: Preprocessing pipeline for additional predictors
+    """
+    # Identify numeric and categorical columns
+    numeric_cols = data.select_dtypes(include=["int64", "float64"]).columns.tolist()
+    categorical_cols = data.select_dtypes(
+        include=["object", "category"]
+    ).columns.tolist()
 
-        # Get predictions
-        preds = predict_model(model, data=X_test_df)
-        pred_col = [
-            col
-            for col in preds.columns
-            if any(x in col.lower() for x in ["prediction", "class", "label"])
-        ][0]
-        y_pred = preds[pred_col].values
+    # Create preprocessing steps
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", StandardScaler(), numeric_cols),
+            (
+                "cat",
+                OneHotEncoder(sparse_output=True, handle_unknown="ignore"),
+                categorical_cols,
+            ),
+        ],
+        remainder="passthrough",
+    )
 
-        # Get probability predictions if available
-        proba_columns = [col for col in preds.columns if "probability" in col.lower()]
+    logger.info(
+        f"Created preprocessing pipeline with {len(numeric_cols)} numeric columns and "
+        f"{len(categorical_cols)} categorical columns"
+    )
 
-        # Calculate metrics
-        metrics = {
-            "accuracy": accuracy_score(y_test, y_pred),
-            "f1": f1_score(y_test, y_pred, average="weighted"),
-            "precision": precision_score(y_test, y_pred, average="weighted"),
-            "recall": recall_score(y_test, y_pred, average="weighted"),
-        }
-
-        # Try to calculate ROC AUC if binary classification
-        try:
-            # If there are probability columns, try to use them for ROC AUC
-            if proba_columns and len(np.unique(y_test)) == 2:
-                proba_values = preds[proba_columns[0]].values
-                metrics["roc_auc"] = roc_auc_score(y_test, proba_values)
-            # Otherwise, try to calculate ROC AUC from predictions
-            elif len(np.unique(y_test)) == 2:
-                metrics["roc_auc"] = roc_auc_score(y_test, y_pred)
-        except Exception:
-            metrics["roc_auc"] = np.nan
-
-    # Save raw predictions and targets for later analysis
-    predictions_data = {
-        "y_true": y_test,
-        "y_pred": y_pred,
-    }
-
-    # Return both metrics and raw data
-    return {
-        "metrics": metrics,
-        "predictions_data": predictions_data,
-    }
+    return preprocessor
 
 
 def save_model(model_info: Dict[str, Any], path: Union[str, Path]) -> None:
@@ -500,3 +616,75 @@ def save_detailed_metrics(
             logger.warning(f"Could not create confusion matrix: {e}")
 
     logger.info(f"Detailed metrics saved to {output_dir}")
+
+
+def _evaluate_regression(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+    """Calculate regression metrics.
+
+    :param y_true: True target values
+    :param y_pred: Predicted values
+    :return: Dictionary of regression metrics
+    """
+    from sklearn.metrics import (
+        explained_variance_score,
+        max_error,
+        mean_absolute_error,
+        mean_absolute_percentage_error,
+        mean_squared_error,
+        median_absolute_error,
+        r2_score,
+    )
+
+    # Calculate metrics
+    metrics = {
+        "r2": r2_score(y_true, y_pred),
+        "rmse": np.sqrt(mean_squared_error(y_true, y_pred)),
+        "mae": mean_absolute_error(y_true, y_pred),
+        "explained_variance": explained_variance_score(y_true, y_pred),
+        "max_error": max_error(y_true, y_pred),
+        "median_absolute_error": median_absolute_error(y_true, y_pred),
+    }
+
+    # Try to compute MAPE, but handle potential division by zero
+    try:
+        metrics["mape"] = mean_absolute_percentage_error(y_true, y_pred)
+    except Exception:
+        metrics["mape"] = np.nan
+
+    return metrics
+
+
+def _evaluate_classification(
+    y_true: np.ndarray, y_pred_proba: np.ndarray, y_pred_class: np.ndarray
+) -> Dict[str, float]:
+    """Calculate classification metrics.
+
+    :param y_true: True target values
+    :param y_pred_proba: Predicted probabilities
+    :param y_pred_class: Predicted class labels
+    :return: Dictionary of classification metrics
+    """
+    from sklearn.metrics import (
+        accuracy_score,
+        f1_score,
+        precision_score,
+        recall_score,
+        roc_auc_score,
+    )
+
+    # Calculate metrics
+    metrics = {
+        "accuracy": accuracy_score(y_true, y_pred_class),
+        "f1": f1_score(y_true, y_pred_class, average="weighted"),
+        "precision": precision_score(y_true, y_pred_class, average="weighted"),
+        "recall": recall_score(y_true, y_pred_class, average="weighted"),
+    }
+
+    # Try to calculate ROC AUC if binary classification
+    try:
+        if len(np.unique(y_true)) == 2:
+            metrics["roc_auc"] = roc_auc_score(y_true, y_pred_proba)
+    except Exception:
+        metrics["roc_auc"] = np.nan
+
+    return metrics

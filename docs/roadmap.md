@@ -4,6 +4,17 @@ This document outlines the planned development path for fast-seqfunc.
 
 ## Current Roadmap Items
 
+### Additional Predictor Columns
+
+Extend Fast-SeqFunc to incorporate additional predictor columns alongside sequence data, enabling context-aware sequence-function modeling. This will allow users to include experimental conditions, environmental factors, or other relevant variables that may influence sequence function relationships.
+
+1. **Preprocessing Pipeline**: Automatic handling of numerical and categorical additional predictors
+2. **Enhanced CLI Support**: Command-line options for specifying additional predictor columns
+3. **Serialization Enhancements**: Extended model format to include additional predictor information
+4. **Feature Importance Analysis**: Tools to understand the relative importance of sequence features vs. additional predictors
+
+See the detailed design document in `docs/design/additional_predictors.md`.
+
 ### Expanded Embedding Methods
 
 Support for more sequence embedding methods beyond one-hot encoding. While the CLI and core functions reference "carp" and "esm2" embedders, these are not currently implemented. Integrating with ESM2, CARP, or other pre-trained models will enhance the library's capabilities.
