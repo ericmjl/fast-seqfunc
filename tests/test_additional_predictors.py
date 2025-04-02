@@ -349,8 +349,8 @@ def test_train_with_larger_dataset(larger_sequence_data_with_predictors):
     # Evaluate the model
     eval_results = evaluate_model(
         model=model_info["model"],
-        sequences=test_data["sequence"],
-        targets=test_data["function"],
+        X_test=test_data["sequence"],
+        y_test=test_data["function"],
         embedder=model_info["embedder"],
         model_type="regression",
         embed_cols=model_info["embed_cols"],
