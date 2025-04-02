@@ -44,6 +44,9 @@ def train(
     model_type: str = typer.Option(
         "regression", help="Model type: regression or classification"
     ),
+    additional_predictors: Optional[str] = typer.Option(
+        None, help="Comma-separated list of additional predictor column names"
+    ),
     output_dir: Path = typer.Option(
         Path("outputs"), help="Directory for all outputs (model, metrics, cache)"
     ),
@@ -72,6 +75,14 @@ def train(
     if "," in embedding_method:
         embedding_method = [m.strip() for m in embedding_method.split(",")]
 
+    # Parse additional predictors if provided
+    additional_predictor_cols = None
+    if additional_predictors:
+        additional_predictor_cols = [
+            p.strip() for p in additional_predictors.split(",")
+        ]
+        logger.info(f"Using additional predictor columns: {additional_predictor_cols}")
+
     # Train the model
     model_info = train_model(
         train_data=train_data,
@@ -79,6 +90,7 @@ def train(
         test_data=test_data,
         sequence_col=sequence_col,
         target_col=target_col,
+        additional_predictor_cols=additional_predictor_cols,
         embedding_method=embedding_method,
         model_type=model_type,
         cache_dir=cache_dir,
@@ -106,7 +118,13 @@ def train(
 
     # Create and save summary information
     _save_model_summary(
-        output_dir, model_path, metrics_dir, cache_dir, embedding_method, model_type
+        output_dir,
+        model_path,
+        metrics_dir,
+        cache_dir,
+        embedding_method,
+        model_type,
+        additional_predictor_cols,
     )
 
     # Clean up any leftover PNG files
@@ -122,6 +140,7 @@ def _save_model_summary(
     cache_dir: Path,
     embedding_method: str,
     model_type: str,
+    additional_predictor_cols: Optional[list] = None,
 ) -> None:
     """Create and save a summary of model information.
 
@@ -131,6 +150,7 @@ def _save_model_summary(
     :param cache_dir: Directory for cache files
     :param embedding_method: Method used for embedding
     :param model_type: Type of model (regression or classification)
+    :param additional_predictor_cols: List of additional predictor column names
     """
     # Save a summary of the output locations
     summary = {
@@ -139,6 +159,7 @@ def _save_model_summary(
         "cache_dir": str(cache_dir),
         "embedding_method": embedding_method,
         "model_type": model_type,
+        "additional_predictor_cols": additional_predictor_cols,
         "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
@@ -267,17 +288,18 @@ def _save_performance_html(
 
 @app.command()
 def predict_cmd(
-    model_path: Path = typer.Argument(..., help="Path to saved model"),
+    model_path: Path = typer.Argument(
+        ..., help="Path to saved model file", metavar="MODEL_PATH"
+    ),
     input_data: Path = typer.Argument(
         ..., help="Path to CSV file with sequences to predict"
     ),
     sequence_col: str = typer.Option("sequence", help="Column name for sequences"),
     output_dir: Path = typer.Option(
-        Path("prediction_outputs"), help="Directory to save prediction results"
+        Path("prediction_outputs"), help="Directory for prediction outputs"
     ),
     predictions_filename: str = typer.Option(
-        "predictions.csv",
-        help="Filename for predictions CSV within the output directory",
+        "predictions.csv", help="Filename for predictions CSV within output directory"
     ),
 ):
     """Generate predictions for new sequences using a trained model."""
@@ -300,12 +322,49 @@ def predict_cmd(
         logger.error(f"Column '{sequence_col}' not found in input data")
         raise typer.Exit(1)
 
-    # Generate predictions
-    logger.info("Generating predictions...")
-    predictions = predict(
-        model_info=model_info,
-        sequences=data[sequence_col],
+    # Check if model requires additional predictors
+    has_additional_predictors = (
+        "additional_predictor_cols" in model_info
+        and model_info["additional_predictor_cols"] is not None
     )
+
+    if has_additional_predictors:
+        # Check that all required additional predictor columns exist
+        missing_cols = [
+            col
+            for col in model_info["additional_predictor_cols"]
+            if col not in data.columns
+        ]
+
+        if missing_cols:
+            logger.error(
+                f"Missing required predictor column(s): {', '.join(missing_cols)}. "
+                f"The model was trained with these additional predictors: "
+                f"{', '.join(model_info['additional_predictor_cols'])}"
+            )
+            raise typer.Exit(1)
+
+        logger.info(
+            "Using additional predictor columns: "
+            f"{model_info['additional_predictor_cols']}"
+        )
+
+        # Generate predictions using the entire DataFrame
+        logger.info(
+            "Generating predictions with sequences and additional predictors..."
+        )
+        predictions = predict(
+            model_info=model_info,
+            sequences=data,  # Pass the entire DataFrame
+            sequence_col=sequence_col,
+        )
+    else:
+        # Generate predictions with just sequences
+        logger.info("Generating predictions...")
+        predictions = predict(
+            model_info=model_info,
+            sequences=data[sequence_col],
+        )
 
     # Save predictions
     result_df = pd.DataFrame(
@@ -350,6 +409,10 @@ def predict_cmd(
         "embedding_method": str(model_info.get("embedding_method", "unknown")),
         "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+    # Add additional predictor information if used
+    if has_additional_predictors:
+        summary["additional_predictor_cols"] = model_info["additional_predictor_cols"]
 
     # Save summary as JSON
     with open(output_dir / "prediction_summary.json", "w") as f:
