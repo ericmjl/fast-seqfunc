@@ -61,6 +61,7 @@ def larger_sequence_data_with_predictors():
     return data
 
 
+@pytest.mark.slow
 def test_train_with_additional_predictors(sequence_data_with_predictors):
     """Test training a model with additional predictors."""
     # Split data into train and test
@@ -89,6 +90,7 @@ def test_train_with_additional_predictors(sequence_data_with_predictors):
     assert isinstance(predictions, np.ndarray)
 
 
+@pytest.mark.slow
 def test_train_with_categorical_predictors(sequence_data_with_predictors):
     """Test training a model with categorical predictors that require encoding."""
     # Split data into train and test
@@ -116,6 +118,7 @@ def test_train_with_categorical_predictors(sequence_data_with_predictors):
     assert isinstance(predictions, np.ndarray)
 
 
+@pytest.mark.slow
 def test_train_with_multiple_predictor_types(sequence_data_with_predictors):
     """Test training a model with multiple types of predictors."""
     # Split data into train and test
@@ -147,6 +150,7 @@ def test_train_with_multiple_predictor_types(sequence_data_with_predictors):
     assert isinstance(predictions, np.ndarray)
 
 
+@pytest.mark.slow
 def test_serialization_with_additional_predictors(
     sequence_data_with_predictors, temp_dir
 ):
@@ -188,6 +192,7 @@ def test_serialization_with_additional_predictors(
     assert isinstance(predictions, np.ndarray)
 
 
+@pytest.mark.slow
 def test_backwards_compatibility(sequence_data_with_predictors):
     """Test that the implementation maintains backward compatibility."""
     # Train model without additional predictors (old behavior)
@@ -217,6 +222,7 @@ def test_backwards_compatibility(sequence_data_with_predictors):
     assert isinstance(predictions, np.ndarray)
 
 
+@pytest.mark.slow
 def test_missing_predictors_error():
     """Test that an appropriate error is raised when a predictor is missing."""
     # Create train data with predictors
@@ -247,6 +253,7 @@ def test_missing_predictors_error():
         predict(model_info, test_data)
 
 
+@pytest.mark.slow
 def test_evaluate_model_with_predictors(sequence_data_with_predictors):
     """Test evaluate_model function with additional predictors."""
     # Split data into train and test
@@ -284,6 +291,7 @@ def test_evaluate_model_with_predictors(sequence_data_with_predictors):
     assert "rmse" in results
 
 
+@pytest.mark.slow
 def test_prediction_with_sequence_list_and_predictors(sequence_data_with_predictors):
     """Test prediction with a list of sequences and a DataFrame of predictors."""
     # Split data into train and test
@@ -311,6 +319,7 @@ def test_prediction_with_sequence_list_and_predictors(sequence_data_with_predict
     assert len(predictions) == len(test_data)
 
 
+@pytest.mark.slow
 def test_train_with_larger_dataset(larger_sequence_data_with_predictors):
     """Test training a model with a larger dataset containing additional predictors."""
     # Use 80% of data for training, 20% for testing
