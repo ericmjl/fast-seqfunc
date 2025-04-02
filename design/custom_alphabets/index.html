@@ -1,0 +1,1541 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://ericmjl.github.io/fast-seqfunc/design/custom_alphabets/">
+      
+      
+        <link rel="prev" href="../additional_predictors_example/">
+      
+      
+        <link rel="next" href="../overall/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
+    
+    
+      
+        <title>Custom Alphabets Design Document - fast-seqfunc</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.4af4bdda.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../apidocs.css">
+    
+      <link rel="stylesheet" href="../../css/ansi-colours.css">
+    
+      <link rel="stylesheet" href="../../css/jupyter-cells.css">
+    
+      <link rel="stylesheet" href="../../css/pandas-dataframe.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#custom-alphabets-design-document" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="fast-seqfunc" class="md-header__button md-logo" aria-label="fast-seqfunc" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M96 0C43 0 0 43 0 96v320c0 53 43 96 96 96h320c17.7 0 32-14.3 32-32s-14.3-32-32-32v-64c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H96m0 384h256v64H96c-17.7 0-32-14.3-32-32s14.3-32 32-32m32-240c0-8.8 7.2-16 16-16h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16m16 48h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16s7.2-16 16-16"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            fast-seqfunc
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Custom Alphabets Design Document
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ericmjl/fast-seqfunc" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ericmjl/fast-seqfunc
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="fast-seqfunc" class="md-nav__button md-logo" aria-label="fast-seqfunc" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M96 0C43 0 0 43 0 96v320c0 53 43 96 96 96h320c17.7 0 32-14.3 32-32s-14.3-32-32-32v-64c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H96m0 384h256v64H96c-17.7 0-32-14.3-32-32s14.3-32 32-32m32-240c0-8.8 7.2-16 16-16h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16m16 48h192c8.8 0 16 7.2 16 16s-7.2 16-16 16H144c-8.8 0-16-7.2-16-16s7.2-16 16-16"/></svg>
+
+    </a>
+    fast-seqfunc
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ericmjl/fast-seqfunc" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ericmjl/fast-seqfunc
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Fast-SeqFunc Documentation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Top-level API for fast-seqfunc
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api_reference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Fast-SeqFunc Quickstart
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Roadmap
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Design
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../additional_predictors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Additional Predictors in Fast-SeqFunc: Design Document
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../additional_predictors_example/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Additional Predictors: Usage Examples
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Custom Alphabets Design Document
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Custom Alphabets Design Document
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alphabet-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alphabet Class
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onehotembedder-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      OneHotEmbedder Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Helper Functions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Helper Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_embedder" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_embedder
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infer_alphabet" class="md-nav__link">
+    <span class="md-ellipsis">
+      infer_alphabet
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Examples
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-custom-alphabets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating Custom Alphabets
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-onehotembedder" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the OneHotEmbedder
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#working-with-sequences-of-different-lengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      Working with Sequences of Different Lengths
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handling-special-sequence-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Handling Special Sequence Types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Handling Special Sequence Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chemically-modified-amino-acids" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chemically Modified Amino Acids
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integer-based-sequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Integer-Based Sequences
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-with-model-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      Integration with Model Training
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alphabet-configuration-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alphabet Configuration Format
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conclusion
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overall/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Fast-SeqFunc: Design Document
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Releases
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Releases
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases/v0.0.3/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    V0.0.3
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases/v0.1.0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    V0.1.0
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases/v0.1.1/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    V0.1.1
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Tutorials
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Tutorials
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/classification_tutorial/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sequence Classification with Fast-SeqFunc
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/regression_tutorial/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sequence Regression with Fast-SeqFunc
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alphabet-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alphabet Class
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onehotembedder-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      OneHotEmbedder Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Helper Functions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Helper Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_embedder" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_embedder
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infer_alphabet" class="md-nav__link">
+    <span class="md-ellipsis">
+      infer_alphabet
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Examples
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-custom-alphabets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating Custom Alphabets
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-onehotembedder" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the OneHotEmbedder
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#working-with-sequences-of-different-lengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      Working with Sequences of Different Lengths
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handling-special-sequence-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Handling Special Sequence Types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Handling Special Sequence Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chemically-modified-amino-acids" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chemically Modified Amino Acids
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integer-based-sequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Integer-Based Sequences
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-with-model-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      Integration with Model Training
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alphabet-configuration-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alphabet Configuration Format
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Features
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conclusion
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="custom-alphabets-design-document">Custom Alphabets Design Document</h1>
+<h2 id="overview">Overview</h2>
+<p>This document outlines the design for enhancing fast-seqfunc with support for custom alphabets, particularly focusing on handling mixed-length characters and various sequence storage formats. This feature enables the library to work with non-standard sequence types, such as chemically modified amino acids, custom nucleotides, or integer-based sequence representations.</p>
+<h2 id="current-implementation">Current Implementation</h2>
+<p>The current implementation in fast-seqfunc handles alphabets in a straightforward manner:</p>
+<ol>
+<li>Alphabets are represented as instances of the <code>Alphabet</code> class that encapsulate tokens and tokenization rules.</li>
+<li>Sequences can be encoded using various tokenization strategies (character-based, delimited, or regex-based).</li>
+<li>The <code>OneHotEmbedder</code> uses alphabets to transform sequences into one-hot encodings for model training.</li>
+<li>Pre-defined alphabets are available for common sequence types (protein, DNA, RNA).</li>
+<li>Custom alphabets are supported through the <code>Alphabet</code> class.</li>
+<li>Sequences of different lengths can be padded to the maximum length with a configurable gap character.</li>
+</ol>
+<h2 id="alphabet-class">Alphabet Class</h2>
+<p>The <code>Alphabet</code> class is at the core of the custom alphabets implementation:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Alphabet</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represent a custom alphabet for sequence encoding.</span>
+
+<span class="sd">    This class handles tokenization and mapping between tokens and indices,</span>
+<span class="sd">    supporting both single character and multi-character tokens.</span>
+
+<span class="sd">    :param tokens: Collection of tokens that define the alphabet</span>
+<span class="sd">    :param delimiter: Optional delimiter used when tokenizing sequences</span>
+<span class="sd">    :param name: Optional name for this alphabet</span>
+<span class="sd">    :param description: Optional description</span>
+<span class="sd">    :param gap_character: Character to use for padding sequences (default: &quot;-&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tokens</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">delimiter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">gap_character</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the number of unique tokens in the alphabet.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">tokenize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequence</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a sequence string to tokens.</span>
+
+<span class="sd">        :param sequence: The input sequence</span>
+<span class="sd">        :return: List of tokens</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">pad_sequence</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequence</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pad a sequence to the specified length.</span>
+
+<span class="sd">        :param sequence: The sequence to pad</span>
+<span class="sd">        :param length: Target length</span>
+<span class="sd">        :return: Padded sequence</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">tokens_to_sequence</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tokens</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert tokens back to a sequence string.</span>
+
+<span class="sd">        :param tokens: List of tokens</span>
+<span class="sd">        :return: Sequence string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">indices_to_sequence</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">delimiter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a list of token indices back to a sequence string.</span>
+
+<span class="sd">        :param indices: List of token indices</span>
+<span class="sd">        :param delimiter: Optional delimiter to use (overrides the alphabet&#39;s default)</span>
+<span class="sd">        :return: Sequence string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode_to_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequence</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a sequence string to token indices.</span>
+
+<span class="sd">        :param sequence: The input sequence</span>
+<span class="sd">        :return: List of token indices</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">decode_from_indices</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">delimiter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decode token indices back to a sequence string.</span>
+
+<span class="sd">        This is an alias for indices_to_sequence.</span>
+
+<span class="sd">        :param indices: List of token indices</span>
+<span class="sd">        :param delimiter: Optional delimiter to use</span>
+<span class="sd">        :return: Sequence string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_sequence</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequence</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if a sequence can be fully tokenized with this alphabet.</span>
+
+<span class="sd">        :param sequence: The sequence to validate</span>
+<span class="sd">        :return: True if sequence is valid, False otherwise</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Alphabet&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an Alphabet instance from a configuration dictionary.</span>
+
+<span class="sd">        :param config: Dictionary with alphabet configuration</span>
+<span class="sd">        :return: Alphabet instance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;Alphabet&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load an alphabet from a JSON file.</span>
+
+<span class="sd">        :param path: Path to the JSON configuration file</span>
+<span class="sd">        :return: Alphabet instance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the alphabet to a dictionary for serialization.</span>
+
+<span class="sd">        :return: Dictionary representation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the alphabet to a JSON file.</span>
+
+<span class="sd">        :param path: Path to save the configuration</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">protein</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">gap_character</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Alphabet&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a standard protein alphabet.</span>
+
+<span class="sd">        :param gap_character: Character to use for padding (default: &quot;-&quot;)</span>
+<span class="sd">        :return: Alphabet for standard amino acids</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dna</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">gap_character</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Alphabet&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a standard DNA alphabet.</span>
+
+<span class="sd">        :param gap_character: Character to use for padding (default: &quot;-&quot;)</span>
+<span class="sd">        :return: Alphabet for DNA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">rna</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">gap_character</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Alphabet&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a standard RNA alphabet.</span>
+
+<span class="sd">        :param gap_character: Character to use for padding (default: &quot;-&quot;)</span>
+<span class="sd">        :return: Alphabet for RNA</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">integer</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">max_value</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">gap_value</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-1&quot;</span><span class="p">,</span> <span class="n">gap_character</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Alphabet&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an integer-based alphabet (0 to max_value).</span>
+
+<span class="sd">        :param max_value: Maximum integer value (inclusive)</span>
+<span class="sd">        :param gap_value: String representation of the gap value (default: &quot;-1&quot;)</span>
+<span class="sd">        :param gap_character: Character to use for padding in string representation</span>
+<span class="sd">            (default: &quot;-&quot;)</span>
+<span class="sd">        :return: Alphabet with integer tokens</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+</code></pre></div>
+<h2 id="onehotembedder-implementation">OneHotEmbedder Implementation</h2>
+<p>The <code>OneHotEmbedder</code> class works with the <code>Alphabet</code> class to create one-hot encodings:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OneHotEmbedder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;One-hot encoding for protein or nucleotide sequences.</span>
+
+<span class="sd">    :param sequence_type: Type of sequences to encode (&quot;protein&quot;, &quot;dna&quot;, &quot;rna&quot;,</span>
+<span class="sd">        or &quot;auto&quot;)</span>
+<span class="sd">    :param alphabet: Custom alphabet to use for encoding (overrides sequence_type)</span>
+<span class="sd">    :param max_length: Maximum sequence length (will pad/truncate to this length)</span>
+<span class="sd">    :param pad_sequences: Whether to pad sequences of different lengths</span>
+<span class="sd">        to the maximum length</span>
+<span class="sd">    :param gap_character: Character to use for padding (default: &quot;-&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">sequence_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;protein&quot;</span><span class="p">,</span> <span class="s2">&quot;dna&quot;</span><span class="p">,</span> <span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="s2">&quot;auto&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+        <span class="n">alphabet</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Alphabet</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_length</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pad_sequences</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">gap_character</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">alphabet</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the alphabet, supporting both old and new API.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;OneHotEmbedder&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Determine alphabet and set up the embedder.</span>
+
+<span class="sd">        :param sequences: Sequences to fit to</span>
+<span class="sd">        :return: Self for chaining</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Transform sequences to one-hot encodings.</span>
+
+<span class="sd">        If sequences are of different lengths and pad_sequences=True, they</span>
+<span class="sd">        will be padded to the max_length with the gap character.</span>
+
+<span class="sd">        If pad_sequences=False, this returns a list of arrays of different sizes.</span>
+
+<span class="sd">        :param sequences: List or Series of sequences to embed</span>
+<span class="sd">        :return: Array of one-hot encodings if pad_sequences=True,</span>
+<span class="sd">            otherwise list of arrays</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit and transform in one step.</span>
+
+<span class="sd">        :param sequences: Sequences to encode</span>
+<span class="sd">        :return: Array of one-hot encodings if pad_sequences=True,</span>
+<span class="sd">            otherwise list of arrays</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+</code></pre></div>
+<h2 id="helper-functions">Helper Functions</h2>
+<h3 id="get_embedder">get_embedder</h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_embedder</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OneHotEmbedder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get an embedder instance based on method name.</span>
+
+<span class="sd">    Currently only supports one-hot encoding.</span>
+
+<span class="sd">    :param method: Embedding method (only &quot;one-hot&quot; supported)</span>
+<span class="sd">    :param kwargs: Additional arguments to pass to the embedder</span>
+<span class="sd">    :return: Configured embedder</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+<h3 id="infer_alphabet">infer_alphabet</h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_alphabet</span><span class="p">(</span>
+    <span class="n">sequences</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">delimiter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">gap_character</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Alphabet</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Infer an alphabet from a list of sequences.</span>
+
+<span class="sd">    :param sequences: List of sequences to analyze</span>
+<span class="sd">    :param delimiter: Optional delimiter used in sequences</span>
+<span class="sd">    :param gap_character: Character to use for padding</span>
+<span class="sd">    :return: Inferred Alphabet</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+<h2 id="usage-examples">Usage Examples</h2>
+<h3 id="creating-custom-alphabets">Creating Custom Alphabets</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Standard alphabets</span>
+<span class="n">protein_alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="o">.</span><span class="n">protein</span><span class="p">()</span>
+<span class="n">dna_alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="o">.</span><span class="n">dna</span><span class="p">()</span>
+<span class="n">rna_alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="o">.</span><span class="n">rna</span><span class="p">()</span>
+
+<span class="c1"># Custom alphabet with standard and modified amino acids</span>
+<span class="n">aa_tokens</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="s2">&quot;ACDEFGHIKLMNPQRSTVWY&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;pS&quot;</span><span class="p">,</span> <span class="s2">&quot;pT&quot;</span><span class="p">,</span> <span class="s2">&quot;pY&quot;</span><span class="p">,</span> <span class="s2">&quot;me3K&quot;</span><span class="p">]</span>
+<span class="n">mod_aa_alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="p">(</span>
+    <span class="n">tokens</span><span class="o">=</span><span class="n">aa_tokens</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;modified_aa&quot;</span><span class="p">,</span>
+    <span class="n">gap_character</span><span class="o">=</span><span class="s2">&quot;X&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Integer alphabet (0-29 with -1 as gap value)</span>
+<span class="n">int_alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="o">.</span><span class="n">integer</span><span class="p">(</span><span class="n">max_value</span><span class="o">=</span><span class="mi">29</span><span class="p">,</span> <span class="n">gap_value</span><span class="o">=</span><span class="s2">&quot;-1&quot;</span><span class="p">)</span>
+
+<span class="c1"># Custom alphabet from configuration</span>
+<span class="n">alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="s2">&quot;path/to/alphabet_config.json&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="using-the-onehotembedder">Using the OneHotEmbedder</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Auto-detect sequence type</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">get_embedder</span><span class="p">(</span><span class="s2">&quot;one-hot&quot;</span><span class="p">)</span>
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+
+<span class="c1"># Specify sequence type</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">get_embedder</span><span class="p">(</span><span class="s2">&quot;one-hot&quot;</span><span class="p">,</span> <span class="n">sequence_type</span><span class="o">=</span><span class="s2">&quot;protein&quot;</span><span class="p">,</span> <span class="n">pad_sequences</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+
+<span class="c1"># Use custom alphabet</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">get_embedder</span><span class="p">(</span><span class="s2">&quot;one-hot&quot;</span><span class="p">,</span> <span class="n">alphabet</span><span class="o">=</span><span class="n">mod_aa_alphabet</span><span class="p">)</span>
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+
+<span class="c1"># Control padding behavior</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">get_embedder</span><span class="p">(</span><span class="s2">&quot;one-hot&quot;</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">pad_sequences</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gap_character</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">)</span>
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="working-with-sequences-of-different-lengths">Working with Sequences of Different Lengths</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Sequences of different lengths</span>
+<span class="n">sequences</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;ACDE&quot;</span><span class="p">,</span> <span class="s2">&quot;KLMNPQR&quot;</span><span class="p">,</span> <span class="s2">&quot;ST&quot;</span><span class="p">]</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">OneHotEmbedder</span><span class="p">(</span><span class="n">sequence_type</span><span class="o">=</span><span class="s2">&quot;protein&quot;</span><span class="p">,</span> <span class="n">pad_sequences</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+<span class="c1"># Sequences are padded to length 7: &quot;ACDE---&quot;, &quot;KLMNPQR&quot;, &quot;ST-----&quot;</span>
+
+<span class="c1"># Disable padding (returns a list of arrays of different sizes)</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">OneHotEmbedder</span><span class="p">(</span><span class="n">sequence_type</span><span class="o">=</span><span class="s2">&quot;protein&quot;</span><span class="p">,</span> <span class="n">pad_sequences</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">embedding_list</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="handling-special-sequence-types">Handling Special Sequence Types</h3>
+<h4 id="chemically-modified-amino-acids">Chemically Modified Amino Acids</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># Amino acids with modifications</span>
+<span class="n">aa_tokens</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="s2">&quot;ACDEFGHIKLMNPQRSTVWY&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;pS&quot;</span><span class="p">,</span> <span class="s2">&quot;pT&quot;</span><span class="p">,</span> <span class="s2">&quot;pY&quot;</span><span class="p">,</span> <span class="s2">&quot;me3K&quot;</span><span class="p">,</span> <span class="s2">&quot;X&quot;</span><span class="p">]</span>
+<span class="n">mod_aa_alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="p">(</span>
+    <span class="n">tokens</span><span class="o">=</span><span class="n">aa_tokens</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;modified_aa&quot;</span><span class="p">,</span>
+    <span class="n">gap_character</span><span class="o">=</span><span class="s2">&quot;X&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Example sequences with modified AAs</span>
+<span class="n">sequences</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;ACDEpS&quot;</span><span class="p">,</span> <span class="s2">&quot;KLMme3KNP&quot;</span><span class="p">,</span> <span class="s2">&quot;QR&quot;</span><span class="p">]</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">OneHotEmbedder</span><span class="p">(</span><span class="n">alphabet</span><span class="o">=</span><span class="n">mod_aa_alphabet</span><span class="p">,</span> <span class="n">pad_sequences</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="integer-based-sequences">Integer-Based Sequences</h4>
+<div class="highlight"><pre><span></span><code><span class="c1"># Integer representation with comma delimiter</span>
+<span class="n">int_alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="o">.</span><span class="n">integer</span><span class="p">(</span><span class="n">max_value</span><span class="o">=</span><span class="mi">29</span><span class="p">,</span> <span class="n">gap_value</span><span class="o">=</span><span class="s2">&quot;-1&quot;</span><span class="p">)</span>
+
+<span class="c1"># Example sequences as comma-separated integers</span>
+<span class="n">sequences</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;0,1,2&quot;</span><span class="p">,</span> <span class="s2">&quot;10,11,12,25,14&quot;</span><span class="p">,</span> <span class="s2">&quot;15,16&quot;</span><span class="p">]</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">OneHotEmbedder</span><span class="p">(</span><span class="n">alphabet</span><span class="o">=</span><span class="n">int_alphabet</span><span class="p">,</span> <span class="n">pad_sequences</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="integration-with-model-training">Integration with Model Training</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Create a custom alphabet</span>
+<span class="n">alphabet</span> <span class="o">=</span> <span class="n">Alphabet</span><span class="o">.</span><span class="n">integer</span><span class="p">(</span><span class="n">max_value</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="c1"># Get the embedder with the custom alphabet</span>
+<span class="n">embedder</span> <span class="o">=</span> <span class="n">get_embedder</span><span class="p">(</span><span class="s2">&quot;one-hot&quot;</span><span class="p">,</span> <span class="n">alphabet</span><span class="o">=</span><span class="n">alphabet</span><span class="p">)</span>
+
+<span class="c1"># Embed sequences</span>
+<span class="n">X_train_embedded</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">train_df</span><span class="p">[</span><span class="n">sequence_col</span><span class="p">])</span>
+
+<span class="c1"># Create column names for the embedded features</span>
+<span class="n">embed_cols</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;embed_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">X_train_embedded</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
+
+<span class="c1"># Create DataFrame for model training</span>
+<span class="n">train_processed</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">X_train_embedded</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">embed_cols</span><span class="p">)</span>
+<span class="n">train_processed</span><span class="p">[</span><span class="s2">&quot;target&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">train_df</span><span class="p">[</span><span class="n">target_col</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+
+<span class="c1"># Now train your model with train_processed...</span>
+</code></pre></div>
+<h2 id="alphabet-configuration-format">Alphabet Configuration Format</h2>
+<p>You can save and load alphabet configurations using JSON files:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;modified_amino_acids&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Amino acids with chemical modifications&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tokens&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;D&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;E&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;F&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;G&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;I&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;K&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;M&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;N&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;P&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Q&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;R&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;S&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;T&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;V&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;W&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Y&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;pS&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;pT&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;pY&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;me3K&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;-&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;delimiter&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;gap_character&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>For integer-based representations:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;amino_acid_indices&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Numbered amino acids (0-25) with comma delimiter&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;tokens&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;3&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;4&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;5&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;6&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;7&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;8&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;9&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;10&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;11&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;12&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;13&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;14&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;15&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;16&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;17&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;18&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;19&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;20&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;21&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;22&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;23&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;24&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;25&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;-1&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;delimiter&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;,&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;gap_character&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;-&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h2 id="key-features">Key Features</h2>
+<ul>
+<li><strong>Flexible Tokenization</strong>: Support for single-character, multi-character, and delimited tokens</li>
+<li><strong>Custom Alphabets</strong>: Define your own token sets for any sequence type</li>
+<li><strong>Gap Handling</strong>: Configurable padding for sequences of different lengths</li>
+<li><strong>Standard Bioinformatics Alphabets</strong>: Built-in support for protein, DNA, and RNA</li>
+<li><strong>Integer Sequences</strong>: Special support for integer-based sequence representations</li>
+<li><strong>Serialization</strong>: Save and load alphabet configurations as JSON</li>
+<li><strong>Automatic Type Detection</strong>: Automatically infer sequence type from content</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>The custom alphabets implementation in <code>fast-seqfunc</code> provides a flexible, robust solution for handling various sequence types and tokenization schemes. This design enables working with non-standard sequence types, mixed-length characters, and integer-based sequences in a clean, consistent way.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/ericmjl" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["instant", "tabs"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+        <script src="../../config.js"></script>
+      
+    
+  </body>
+</html>
