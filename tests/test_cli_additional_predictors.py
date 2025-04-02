@@ -9,6 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from fast_seqfunc.cli import app
+from fast_seqfunc.synthetic import generate_dataset_with_predictors
 
 
 @pytest.fixture
@@ -36,6 +37,35 @@ def dataset_with_predictors(temp_dir):
 
     # Save to CSV in the temp directory
     data_path = Path(temp_dir) / "data_with_predictors.csv"
+    data.to_csv(data_path, index=False)
+
+    return data_path
+
+
+@pytest.fixture
+def large_synthetic_dataset(temp_dir):
+    """Generate a larger synthetic dataset with sequences and additional predictors."""
+    # Use synthetic data generator to create a more robust dataset
+    data = generate_dataset_with_predictors(
+        task="nonlinear_composition",  # Nonlinear regression task
+        count=100,  # 100 samples
+        noise_level=0.2,  # Add some noise
+        num_numeric_predictors=2,  # Add 2 numeric predictors
+        num_categorical_predictors=1,  # Add 1 categorical predictor
+        correlation_strength=0.7,  # Strong correlation with target
+    )
+
+    # Rename columns to more descriptive names for CLI tests
+    data = data.rename(
+        columns={
+            "predictor1": "concentration",
+            "predictor2": "pH",
+            "categorical_pred1": "buffer_type",
+        }
+    )
+
+    # Save to CSV in the temp directory
+    data_path = Path(temp_dir) / "large_synthetic_data.csv"
     data.to_csv(data_path, index=False)
 
     return data_path
@@ -339,3 +369,108 @@ def test_cli_backwards_compatibility(dataset_with_predictors, temp_dir):
 
     assert result.exit_code == 0
     assert predictions_path.exists()
+
+
+@pytest.mark.slow
+def test_cli_with_large_synthetic_dataset(large_synthetic_dataset, temp_dir):
+    """Test CLI with a larger synthetic dataset including additional predictors."""
+    runner = CliRunner()
+    output_dir = Path(temp_dir) / "outputs_large_synthetic"
+    model_path = output_dir / "model.pkl"
+
+    # Read data to get column names
+    data = pd.read_csv(large_synthetic_dataset)
+
+    # Train model with all predictors
+    result = runner.invoke(
+        app,
+        [
+            "train",
+            str(large_synthetic_dataset),
+            "--sequence-col",
+            "sequence",
+            "--target-col",
+            "function",
+            "--embedding-method",
+            "one-hot",
+            "--model-type",
+            "regression",
+            "--output-dir",
+            str(output_dir),
+            "--model-filename",
+            "model.pkl",
+            "--additional-predictors",
+            "concentration,pH,buffer_type",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert model_path.exists()
+
+    # Make predictions on the same dataset
+    predictions_dir = Path(temp_dir) / "prediction_large_synthetic"
+    predictions_path = predictions_dir / "predictions.csv"
+    result = runner.invoke(
+        app,
+        [
+            "predict-cmd",
+            str(model_path),
+            str(large_synthetic_dataset),
+            "--sequence-col",
+            "sequence",
+            "--output-dir",
+            str(predictions_dir),
+            "--predictions-filename",
+            "predictions.csv",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert predictions_path.exists()
+
+    # Verify predictions
+    predictions_df = pd.read_csv(predictions_path)
+    assert len(predictions_df) == len(data)
+    assert "sequence" in predictions_df.columns
+    assert "prediction" in predictions_df.columns
+
+    # Create a split dataset for testing generalization
+    train_data = data.iloc[:80]
+    test_data = data.iloc[80:]
+
+    train_path = Path(temp_dir) / "train_large_synthetic.csv"
+    test_path = Path(temp_dir) / "test_large_synthetic.csv"
+
+    train_data.to_csv(train_path, index=False)
+    test_data.to_csv(test_path, index=False)
+
+    # Train on split data
+    split_output_dir = Path(temp_dir) / "outputs_split_synthetic"
+    split_model_path = split_output_dir / "model.pkl"
+
+    result = runner.invoke(
+        app,
+        [
+            "train",
+            str(train_path),
+            "--sequence-col",
+            "sequence",
+            "--target-col",
+            "function",
+            "--embedding-method",
+            "one-hot",
+            "--model-type",
+            "regression",
+            "--output-dir",
+            str(split_output_dir),
+            "--model-filename",
+            "model.pkl",
+            "--additional-predictors",
+            "concentration,pH,buffer_type",
+            "--test-data",
+            str(test_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert split_model_path.exists()

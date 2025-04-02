@@ -1215,3 +1215,126 @@ def generate_dataset_by_task(
         )
 
     return task_functions[task](count=count, noise_level=noise_level, **kwargs)
+
+
+def add_additional_predictors(
+    df: pd.DataFrame,
+    target_col: str = "function",
+    num_numeric_predictors: int = 2,
+    num_categorical_predictors: int = 1,
+    correlation_strength: float = 0.5,
+    categorical_values: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """Add synthetic additional predictor columns to a sequence-function dataset.
+
+    This function adds both numeric and categorical predictor columns with
+    controllable correlation to the target variable.
+
+    :param df: DataFrame with sequences and target values
+    :param target_col: Name of the target column
+    :param num_numeric_predictors: Number of numeric predictor columns to add
+    :param num_categorical_predictors: Number of categorical predictor columns to add
+    :param correlation_strength: How strongly predictors correlate with target (0-1)
+    :param categorical_values: List of possible categorical values
+        (defaults to ["A", "B", "C"])
+    :return: DataFrame with additional predictor columns
+    """
+    if not categorical_values:
+        categorical_values = ["A", "B", "C"]
+
+    # Make a copy of the DataFrame to avoid modifying the original
+    result_df = df.copy()
+
+    # Get the target values
+    target = result_df[target_col].values
+
+    # Normalize target to [0, 1] for easier correlation control
+    target_norm = (target - np.min(target)) / (np.max(target) - np.min(target))
+
+    # Add numeric predictors
+    for i in range(num_numeric_predictors):
+        # Generate random noise
+        noise = np.random.normal(0, 1, size=len(df))
+
+        # Create predictor with controlled correlation to target
+        predictor = (
+            correlation_strength * target_norm + (1 - correlation_strength) * noise
+        )
+
+        # Scale the predictor to a reasonable range (e.g., 0-100)
+        predictor = predictor * 100
+
+        # Add to DataFrame
+        result_df[f"predictor{i + 1}"] = predictor
+
+    # Add categorical predictors
+    for i in range(num_categorical_predictors):
+        # Probability vector based on target values
+        probs = np.zeros((len(df), len(categorical_values)))
+
+        # For each category, create a probability distribution influenced by the target
+        for j, _ in enumerate(categorical_values):
+            # Create thresholds that divide the [0,1] range
+            threshold_low = j / len(categorical_values)
+            threshold_high = (j + 1) / len(categorical_values)
+
+            # Higher probability if target is in this range
+            influence = np.exp(
+                -5 * np.abs(target_norm - (threshold_low + threshold_high) / 2)
+            )
+
+            # Scale influence by correlation strength
+            probs[:, j] = correlation_strength * influence + (
+                1 - correlation_strength
+            ) / len(categorical_values)
+
+        # Normalize probabilities to sum to 1
+        probs = probs / probs.sum(axis=1, keepdims=True)
+
+        # Sample categories based on probabilities
+        categories = np.array(
+            [np.random.choice(categorical_values, p=prob) for prob in probs]
+        )
+
+        # Add to DataFrame
+        result_df[f"categorical_pred{i + 1}"] = categories
+
+    return result_df
+
+
+def generate_dataset_with_predictors(
+    task: str,
+    count: int = 100,
+    noise_level: float = 0.1,
+    num_numeric_predictors: int = 2,
+    num_categorical_predictors: int = 1,
+    correlation_strength: float = 0.5,
+    **kwargs,
+) -> pd.DataFrame:
+    """Generate a synthetic dataset for a specific task with additional predictors.
+
+    This is a convenience wrapper around generate_dataset_by_task
+    and add_additional_predictors.
+
+    :param task: Name of the task to generate
+    :param count: Number of sequences to generate
+    :param noise_level: Level of noise to add to the sequence-function relationship
+    :param num_numeric_predictors: Number of numeric predictor columns to add
+    :param num_categorical_predictors: Number of categorical predictor columns to add
+    :param correlation_strength: How strongly predictors correlate with target (0-1)
+    :param kwargs: Additional parameters for specific tasks
+    :return: DataFrame with sequences, function values, and additional predictors
+    """
+    # Generate base dataset for the specified task
+    df = generate_dataset_by_task(
+        task=task, count=count, noise_level=noise_level, **kwargs
+    )
+
+    # Add additional predictors
+    return add_additional_predictors(
+        df=df,
+        target_col="function",
+        num_numeric_predictors=num_numeric_predictors,
+        num_categorical_predictors=num_categorical_predictors,
+        correlation_strength=correlation_strength,
+    )
