@@ -99,19 +99,42 @@ def train_model(
                 
         logger.info(f"Using reference sequence: {reference_sequence[:50]}... (function: {reference_function})")
         
-        # Generate differential training data
-        diff_sequences, diff_functions = _generate_differential_training_data(
+        # Generate differential training data (pairwise comparisons)
+        sequence_pairs, diff_functions = _generate_differential_training_data(
             train_df[sequence_col].tolist(),
             train_df[target_col].tolist(),
             reference_sequence,
             reference_function
         )
         
-        # Create new training DataFrame with differential data
-        train_df = pd.DataFrame({
-            sequence_col: diff_sequences,
-            target_col: diff_functions
-        })
+        # Compute pairwise embedding differences
+        logger.info("Computing pairwise embedding differences...")
+        base_embedder = get_embedder("one-hot", **kwargs.get('embedder_kwargs', {}))
+        
+        # Fit base embedder on all unique sequences
+        all_sequences = list(set([seq for pair in sequence_pairs for seq in pair]))
+        base_embedder.fit(all_sequences)
+        
+        # Compute pairwise embedding differences
+        pairwise_embeddings = []
+        for seq_i, seq_j in sequence_pairs:
+            embed_i = base_embedder.transform([seq_i])[0]
+            embed_j = base_embedder.transform([seq_j])[0]
+            pairwise_embeddings.append(embed_i - embed_j)
+        
+        # Create training data with pairwise embedding differences
+        X_train_embedded = np.array(pairwise_embeddings)
+        embed_cols = [f"embed_{i}" for i in range(X_train_embedded.shape[1])]
+        
+        # Create DataFrame with pairwise embeddings and differential targets
+        train_processed = pd.DataFrame(X_train_embedded, columns=embed_cols)
+        train_processed["target"] = diff_functions
+        
+        # Store the base embedder and reference info for prediction
+        embedder = base_embedder
+        embedder._reference_sequence = reference_sequence
+        embedder._reference_function = reference_function
+        embedder._is_pairwise_differential = True
         
         # Add additional predictor columns if they exist
         if additional_predictor_cols:
@@ -123,26 +146,28 @@ def train_model(
         if embedding_method != "differential-one-hot":
             embedding_method = "differential-one-hot"
 
-    # Get embedder for sequences
-    logger.info(f"Generating {embedding_method} embeddings...")
-    
-    # Set up embedder with reference information for differential prediction
-    if embedding_method == "differential-one-hot":
-        embedder = get_embedder(
-            embedding_method,
-            reference_sequence=reference_sequence,
-            reference_function=reference_function,
-            **kwargs.get('embedder_kwargs', {})
-        )
     else:
-        embedder = get_embedder(embedding_method, **kwargs.get('embedder_kwargs', {}))
+        # Standard prediction mode - compute embeddings normally
+        # Get embedder for sequences
+        logger.info(f"Generating {embedding_method} embeddings...")
+        
+        # Set up embedder with reference information for differential prediction
+        if embedding_method == "differential-one-hot":
+            embedder = get_embedder(
+                embedding_method,
+                reference_sequence=reference_sequence,
+                reference_function=reference_function,
+                **kwargs.get('embedder_kwargs', {})
+            )
+        else:
+            embedder = get_embedder(embedding_method, **kwargs.get('embedder_kwargs', {}))
 
-    # Create column names for embeddings
-    X_train_embedded = embedder.fit_transform(train_df[sequence_col])
-    embed_cols = [f"embed_{i}" for i in range(X_train_embedded.shape[1])]
+        # Create column names for embeddings
+        X_train_embedded = embedder.fit_transform(train_df[sequence_col])
+        embed_cols = [f"embed_{i}" for i in range(X_train_embedded.shape[1])]
 
-    # Create DataFrame with embeddings
-    train_processed = pd.DataFrame(X_train_embedded, columns=embed_cols)
+        # Create DataFrame with embeddings
+        train_processed = pd.DataFrame(X_train_embedded, columns=embed_cols)
 
     # Prepare additional predictors preprocessing pipeline
     additional_predictor_preprocessing = None
@@ -182,8 +207,9 @@ def train_model(
             f"{len(additional_cols)} additional predictor features"
         )
 
-    # Add target column to processed data
-    train_processed["target"] = train_df[target_col].values
+    # Add target column to processed data (only for standard prediction)
+    if not (differential_prediction or embedding_method == "differential-one-hot"):
+        train_processed["target"] = train_df[target_col].values
 
     # Setup PyCaret environment
     logger.info(f"Setting up PyCaret for {model_type} modeling...")
@@ -435,9 +461,22 @@ def predict(
     embedder = model_info["embedder"]
     embed_cols = model_info["embed_cols"]
 
-    # Embed sequences
-    X_embedded = embedder.transform(sequences)
-    X_df = pd.DataFrame(X_embedded, columns=embed_cols)
+    # Check if this is a pairwise differential model
+    if hasattr(embedder, '_is_pairwise_differential') and embedder._is_pairwise_differential:
+        # For pairwise differential prediction, compute differences from reference
+        reference_embedding = embedder.transform([embedder._reference_sequence])[0]
+        pairwise_embeddings = []
+        
+        for seq in sequences:
+            seq_embedding = embedder.transform([seq])[0]
+            pairwise_embeddings.append(seq_embedding - reference_embedding)
+        
+        X_embedded = np.array(pairwise_embeddings)
+        X_df = pd.DataFrame(X_embedded, columns=embed_cols)
+    else:
+        # Standard embedding
+        X_embedded = embedder.transform(sequences)
+        X_df = pd.DataFrame(X_embedded, columns=embed_cols)
 
     # Add additional predictors if needed
     if has_additional_predictors:
@@ -480,7 +519,13 @@ def predict(
 
     # Handle differential prediction: convert function differences to absolute values
     if model_info.get("differential_prediction", False):
-        reference_function = model_info["reference_function"]
+        if hasattr(embedder, '_is_pairwise_differential') and embedder._is_pairwise_differential:
+            # For pairwise differential models, use stored reference function
+            reference_function = embedder._reference_function
+        else:
+            # For regular differential models, use model_info reference function
+            reference_function = model_info["reference_function"]
+        
         logger.info(f"Converting differential predictions to absolute values using reference function: {reference_function}")
         predictions = predictions + reference_function
 
@@ -572,18 +617,19 @@ def _generate_differential_training_data(
     reference_sequence: str,
     reference_function: float,
     random_seed: int = 42
-) -> tuple[List[str], List[float]]:
+) -> tuple[List[tuple[str, str]], List[float]]:
     """Generate differential training data from sequence-function pairs.
     
-    This function creates a training dataset where each sequence is paired with
-    the reference sequence, and the target is the function difference.
+    This function creates a training dataset with all pairwise comparisons
+    between sequences. For each pair (seq_i, seq_j), the model learns to predict
+    func_i - func_j from embedding(seq_i) - embedding(seq_j).
     
     :param sequences: List of sequences
     :param functions: List of corresponding function values
-    :param reference_sequence: Reference sequence for differential computation
-    :param reference_function: Function value of reference sequence
+    :param reference_sequence: Reference sequence for differential computation (used for prediction)
+    :param reference_function: Function value of reference sequence (used for prediction)
     :param random_seed: Random seed for reproducibility
-    :return: Tuple of (sequences, function_differences)
+    :return: Tuple of (sequence_pairs, function_differences)
     """
     import random
     
@@ -591,21 +637,19 @@ def _generate_differential_training_data(
     random.seed(random_seed)
     np.random.seed(random_seed)
     
-    # Create pairs: each sequence paired with reference
-    paired_sequences = []
+    # Create all pairwise comparisons (n^2 pairs)
+    sequence_pairs = []
     function_differences = []
     
-    for seq, func in zip(sequences, functions):
-        # Skip if sequence is the same as reference
-        if seq == reference_sequence:
-            continue
-            
-        paired_sequences.append(seq)
-        function_differences.append(func - reference_function)
+    for i, (seq_i, func_i) in enumerate(zip(sequences, functions)):
+        for j, (seq_j, func_j) in enumerate(zip(sequences, functions)):
+            if i != j:  # Skip self-comparisons
+                sequence_pairs.append((seq_i, seq_j))
+                function_differences.append(func_i - func_j)  # Target: func_i - func_j
     
-    logger.info(f"Generated {len(paired_sequences)} differential training pairs")
+    logger.info(f"Generated {len(sequence_pairs)} differential training pairs (n^2 pairwise comparisons)")
     
-    return paired_sequences, function_differences
+    return sequence_pairs, function_differences
 
 
 def _select_reference_sequence(

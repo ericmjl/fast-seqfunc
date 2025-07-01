@@ -83,10 +83,10 @@ fast-seqfunc predict-cmd model.pkl new_data.csv --output-dir predictions
 
 #### Differential Prediction:
 1. Load sequence data and select reference sequence (median/mean/random strategy)
-2. Generate training pairs: each sequence vs reference with function differences as targets
-3. Embed sequences using DifferentialEmbedder (computes embedding differences from reference)
-4. Train models on embedding differences → function differences
-5. For prediction: compute embedding differences, predict function differences, add reference function
+2. Generate n² pairwise training data: for each pair (seq_i, seq_j), target = func_i - func_j
+3. Compute pairwise embedding differences: embedding(seq_i) - embedding(seq_j) for all pairs
+4. Train models on pairwise embedding differences → pairwise function differences
+5. For prediction: compute embedding(new_seq) - embedding(reference), predict difference, add reference function
 
 ## Testing Strategy
 
@@ -148,7 +148,7 @@ fast-seqfunc train data.csv \
 ### Key Implementation Details
 
 - **Reference Selection**: Automatically selects reference using median/mean function value or random choice
-- **Training Data**: Generates pairs using all sequences vs reference with function differences as targets  
+- **Training Data**: Generates n² pairwise comparisons between all sequences with function differences as targets  
 - **Embeddings**: DifferentialEmbedder computes embedding differences from reference sequence
 - **Model Storage**: Saves reference sequence and function value with trained model
 - **Prediction**: Converts predicted function differences back to absolute values using stored reference
