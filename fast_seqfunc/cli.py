@@ -39,7 +39,7 @@ def train(
     ),
     test_data: Optional[Path] = typer.Option(None, help="Optional path to test data"),
     embedding_method: str = typer.Option(
-        "one-hot", help="Embedding method: one-hot, carp, esm2, or auto"
+        "one-hot", help="Embedding method: one-hot, differential-one-hot, carp, esm2, or auto"
     ),
     model_type: str = typer.Option(
         "regression", help="Model type: regression or classification"
@@ -52,6 +52,18 @@ def train(
     ),
     model_filename: str = typer.Option(
         "model.pkl", help="Filename for the saved model within the output directory"
+    ),
+    differential_prediction: bool = typer.Option(
+        False, help="Enable differential prediction mode"
+    ),
+    reference_sequence: Optional[str] = typer.Option(
+        None, help="Reference sequence for differential prediction"
+    ),
+    reference_function: Optional[float] = typer.Option(
+        None, help="Function value of reference sequence"
+    ),
+    reference_strategy: str = typer.Option(
+        "median", help="Strategy for selecting reference sequence: median, mean, random"
     ),
 ):
     """Train a sequence-function model on protein or nucleotide sequences."""
@@ -93,6 +105,10 @@ def train(
         additional_predictor_cols=additional_predictor_cols,
         embedding_method=embedding_method,
         model_type=model_type,
+        differential_prediction=differential_prediction,
+        reference_sequence=reference_sequence,
+        reference_function=reference_function,
+        reference_strategy=reference_strategy,
         cache_dir=cache_dir,
     )
 
@@ -613,6 +629,7 @@ def compare_embeddings(
                 target_col=target_col,
                 embedding_method=method,
                 model_type=model_type,
+                differential_prediction=False,  # Not supported in comparison mode
                 cache_dir=cache_dir,
             )
 
