@@ -6,7 +6,7 @@ machine learning models to predict functions from sequence data.
 
 from fast_seqfunc.alphabets import Alphabet, infer_alphabet
 from fast_seqfunc.core import predict, save_model, train_model
-from fast_seqfunc.embedders import OneHotEmbedder, get_embedder
+from fast_seqfunc.embedders import OneHotEmbedder, DifferentialEmbedder, get_embedder
 from fast_seqfunc.synthetic import (
     create_content_ratio_task,
     # Biological sequence tasks
@@ -46,6 +46,7 @@ __all__ = [
     "predict",
     "get_embedder",
     "OneHotEmbedder",
+    "DifferentialEmbedder",
     "Alphabet",
     "infer_alphabet",
     "generate_random_sequences",

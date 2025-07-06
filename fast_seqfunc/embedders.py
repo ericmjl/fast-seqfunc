@@ -238,18 +238,109 @@ class OneHotEmbedder:
             return "dna"  # Default to DNA
 
 
-def get_embedder(method: str, **kwargs) -> OneHotEmbedder:
+class DifferentialEmbedder:
+    """Wrapper embedder that computes differences between sequence embeddings.
+    
+    This embedder is designed for differential prediction where we predict
+    function differences based on embedding differences relative to a reference sequence.
+    
+    :param base_embedder: The underlying embedder to use (e.g., OneHotEmbedder)
+    :param reference_sequence: Reference sequence for differential computation
+    :param reference_function: Function value of the reference sequence
+    """
+    
+    def __init__(
+        self, 
+        base_embedder: OneHotEmbedder,
+        reference_sequence: Optional[str] = None,
+        reference_function: Optional[float] = None
+    ):
+        self.base_embedder = base_embedder
+        self.reference_sequence = reference_sequence
+        self.reference_function = reference_function
+        self._reference_embedding = None
+        
+    def fit(self, sequences: Union[List[str], pd.Series]) -> "DifferentialEmbedder":
+        """Fit the base embedder and compute reference embedding.
+        
+        :param sequences: Sequences to fit to
+        :return: Self for chaining
+        """
+        # Fit the base embedder
+        self.base_embedder.fit(sequences)
+        
+        # Compute reference embedding if reference sequence is set
+        if self.reference_sequence is not None:
+            self._reference_embedding = self.base_embedder.transform([self.reference_sequence])[0]
+            
+        return self
+        
+    def transform(self, sequences: Union[List[str], pd.Series]) -> np.ndarray:
+        """Transform sequences to differential embeddings (differences from reference).
+        
+        :param sequences: Sequences to transform
+        :return: Array of embedding differences from reference
+        """
+        if self._reference_embedding is None:
+            raise ValueError("Reference embedding not computed. Ensure reference_sequence is set and fit() has been called.")
+            
+        # Get base embeddings
+        base_embeddings = self.base_embedder.transform(sequences)
+        
+        # Compute differences from reference
+        if len(base_embeddings.shape) == 1:
+            # Single sequence
+            return base_embeddings - self._reference_embedding
+        else:
+            # Multiple sequences
+            return base_embeddings - self._reference_embedding[np.newaxis, :]
+            
+    def fit_transform(self, sequences: Union[List[str], pd.Series]) -> np.ndarray:
+        """Fit and transform in one step.
+        
+        :param sequences: Sequences to encode
+        :return: Array of differential embeddings
+        """
+        return self.fit(sequences).transform(sequences)
+        
+    def set_reference(self, sequence: str, function_value: float) -> None:
+        """Set the reference sequence and function value.
+        
+        :param sequence: Reference sequence
+        :param function_value: Function value of the reference sequence
+        """
+        self.reference_sequence = sequence
+        self.reference_function = function_value
+        
+        # Recompute reference embedding if base embedder is already fitted
+        if hasattr(self.base_embedder, 'alphabet') and self.base_embedder.alphabet is not None:
+            self._reference_embedding = self.base_embedder.transform([sequence])[0]
+
+
+def get_embedder(method: str, **kwargs) -> Union[OneHotEmbedder, DifferentialEmbedder]:
     """Get an embedder instance based on method name.
 
-    Currently only supports one-hot encoding.
-
-    :param method: Embedding method (only "one-hot" supported)
+    :param method: Embedding method ("one-hot" or "differential-one-hot")
     :param kwargs: Additional arguments to pass to the embedder
     :return: Configured embedder
     """
-    if method != "one-hot":
-        raise ValueError(
-            f"Unsupported embedding method: {method}. Only 'one-hot' is supported."
+    if method == "one-hot":
+        return OneHotEmbedder(**kwargs)
+    elif method == "differential-one-hot":
+        # Extract differential-specific kwargs
+        reference_sequence = kwargs.pop('reference_sequence', None)
+        reference_function = kwargs.pop('reference_function', None)
+        
+        # Create base embedder with remaining kwargs
+        base_embedder = OneHotEmbedder(**kwargs)
+        
+        return DifferentialEmbedder(
+            base_embedder=base_embedder,
+            reference_sequence=reference_sequence,
+            reference_function=reference_function
         )
-
-    return OneHotEmbedder(**kwargs)
+    else:
+        raise ValueError(
+            f"Unsupported embedding method: {method}. "
+            f"Supported methods: 'one-hot', 'differential-one-hot'"
+        )

@@ -15,7 +15,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from fast_seqfunc.embedders import get_embedder
+from fast_seqfunc.embedders import get_embedder, DifferentialEmbedder
 
 # Global session counter for PyCaret
 _session_id = 42
@@ -28,9 +28,13 @@ def train_model(
     sequence_col: str = "sequence",
     target_col: str = "function",
     additional_predictor_cols: Optional[List[str]] = None,
-    embedding_method: Literal["one-hot", "carp", "esm2"] = "one-hot",
+    embedding_method: Literal["one-hot", "carp", "esm2", "differential-one-hot"] = "one-hot",
     model_type: Literal["regression", "classification"] = "regression",
     optimization_metric: Optional[str] = None,
+    differential_prediction: bool = False,
+    reference_sequence: Optional[str] = None,
+    reference_function: Optional[float] = None,
+    reference_strategy: str = "median",
     **kwargs: Any,
 ) -> Dict[str, Any]:
     """Train a sequence-function model using PyCaret.
@@ -49,6 +53,11 @@ def train_model(
     :param embedding_method: Method to use for embedding sequences
     :param model_type: Type of modeling problem (regression or classification)
     :param optimization_metric: Metric to optimize during model selection
+    :param differential_prediction: Whether to use differential prediction mode
+    :param reference_sequence: Reference sequence for differential prediction
+    :param reference_function: Function value of reference sequence
+    :param reference_strategy: Strategy for selecting reference sequence
+        ("median", "mean", "random")
     :param kwargs: Additional arguments for PyCaret setup
     :return: Dictionary containing the trained model and related metadata
     """
@@ -69,16 +78,96 @@ def train_model(
             _validate_additional_predictors(test_df, additional_predictor_cols)
         logger.info(f"Using additional predictor columns: {additional_predictor_cols}")
 
-    # Get embedder for sequences
-    logger.info(f"Generating {embedding_method} embeddings...")
-    embedder = get_embedder(embedding_method)
+    # Handle differential prediction mode
+    if differential_prediction or embedding_method == "differential-one-hot":
+        if model_type != "regression":
+            raise ValueError("Differential prediction is currently only supported for regression tasks")
+            
+        logger.info("Setting up differential prediction mode...")
+        
+        # Select reference sequence if not provided
+        if reference_sequence is None or reference_function is None:
+            ref_seq, ref_func = _select_reference_sequence(
+                train_df[sequence_col].tolist(),
+                train_df[target_col].tolist(),
+                strategy=reference_strategy
+            )
+            if reference_sequence is None:
+                reference_sequence = ref_seq
+            if reference_function is None:
+                reference_function = ref_func
+                
+        logger.info(f"Using reference sequence: {reference_sequence[:50]}... (function: {reference_function})")
+        
+        # Generate differential training data (pairwise comparisons)
+        sequence_pairs, diff_functions = _generate_differential_training_data(
+            train_df[sequence_col].tolist(),
+            train_df[target_col].tolist(),
+            reference_sequence,
+            reference_function
+        )
+        
+        # Compute pairwise embedding differences
+        logger.info("Computing pairwise embedding differences...")
+        base_embedder = get_embedder("one-hot", **kwargs.get('embedder_kwargs', {}))
+        
+        # Fit base embedder on all unique sequences
+        all_sequences = list(set([seq for pair in sequence_pairs for seq in pair]))
+        base_embedder.fit(all_sequences)
+        
+        # Compute pairwise embedding differences
+        pairwise_embeddings = []
+        for seq_i, seq_j in sequence_pairs:
+            embed_i = base_embedder.transform([seq_i])[0]
+            embed_j = base_embedder.transform([seq_j])[0]
+            pairwise_embeddings.append(embed_i - embed_j)
+        
+        # Create training data with pairwise embedding differences
+        X_train_embedded = np.array(pairwise_embeddings)
+        embed_cols = [f"embed_{i}" for i in range(X_train_embedded.shape[1])]
+        
+        # Create DataFrame with pairwise embeddings and differential targets
+        train_processed = pd.DataFrame(X_train_embedded, columns=embed_cols)
+        train_processed["target"] = diff_functions
+        
+        # Store the base embedder and reference info for prediction
+        embedder = base_embedder
+        embedder._reference_sequence = reference_sequence
+        embedder._reference_function = reference_function
+        embedder._is_pairwise_differential = True
+        
+        # Add additional predictor columns if they exist
+        if additional_predictor_cols:
+            # For differential prediction, we need to select the corresponding rows
+            # This is a simplified approach - in practice, you might want more sophisticated handling
+            logger.warning("Additional predictors with differential prediction not fully implemented")
+        
+        # Force embedding method to differential if not already set
+        if embedding_method != "differential-one-hot":
+            embedding_method = "differential-one-hot"
 
-    # Create column names for embeddings
-    X_train_embedded = embedder.fit_transform(train_df[sequence_col])
-    embed_cols = [f"embed_{i}" for i in range(X_train_embedded.shape[1])]
+    else:
+        # Standard prediction mode - compute embeddings normally
+        # Get embedder for sequences
+        logger.info(f"Generating {embedding_method} embeddings...")
+        
+        # Set up embedder with reference information for differential prediction
+        if embedding_method == "differential-one-hot":
+            embedder = get_embedder(
+                embedding_method,
+                reference_sequence=reference_sequence,
+                reference_function=reference_function,
+                **kwargs.get('embedder_kwargs', {})
+            )
+        else:
+            embedder = get_embedder(embedding_method, **kwargs.get('embedder_kwargs', {}))
 
-    # Create DataFrame with embeddings
-    train_processed = pd.DataFrame(X_train_embedded, columns=embed_cols)
+        # Create column names for embeddings
+        X_train_embedded = embedder.fit_transform(train_df[sequence_col])
+        embed_cols = [f"embed_{i}" for i in range(X_train_embedded.shape[1])]
+
+        # Create DataFrame with embeddings
+        train_processed = pd.DataFrame(X_train_embedded, columns=embed_cols)
 
     # Prepare additional predictors preprocessing pipeline
     additional_predictor_preprocessing = None
@@ -118,8 +207,9 @@ def train_model(
             f"{len(additional_cols)} additional predictor features"
         )
 
-    # Add target column to processed data
-    train_processed["target"] = train_df[target_col].values
+    # Add target column to processed data (only for standard prediction)
+    if not (differential_prediction or embedding_method == "differential-one-hot"):
+        train_processed["target"] = train_df[target_col].values
 
     # Setup PyCaret environment
     logger.info(f"Setting up PyCaret for {model_type} modeling...")
@@ -298,6 +388,14 @@ def train_model(
             "test_results": test_results,
         }
 
+        # Add differential prediction information if used
+        if differential_prediction or embedding_method == "differential-one-hot":
+            model_info["differential_prediction"] = True
+            model_info["reference_sequence"] = reference_sequence
+            model_info["reference_function"] = reference_function
+        else:
+            model_info["differential_prediction"] = False
+
         # Add additional predictor information if used
         if additional_predictor_cols:
             model_info["additional_predictor_cols"] = additional_predictor_cols
@@ -363,9 +461,22 @@ def predict(
     embedder = model_info["embedder"]
     embed_cols = model_info["embed_cols"]
 
-    # Embed sequences
-    X_embedded = embedder.transform(sequences)
-    X_df = pd.DataFrame(X_embedded, columns=embed_cols)
+    # Check if this is a pairwise differential model
+    if hasattr(embedder, '_is_pairwise_differential') and embedder._is_pairwise_differential:
+        # For pairwise differential prediction, compute differences from reference
+        reference_embedding = embedder.transform([embedder._reference_sequence])[0]
+        pairwise_embeddings = []
+        
+        for seq in sequences:
+            seq_embedding = embedder.transform([seq])[0]
+            pairwise_embeddings.append(seq_embedding - reference_embedding)
+        
+        X_embedded = np.array(pairwise_embeddings)
+        X_df = pd.DataFrame(X_embedded, columns=embed_cols)
+    else:
+        # Standard embedding
+        X_embedded = embedder.transform(sequences)
+        X_df = pd.DataFrame(X_embedded, columns=embed_cols)
 
     # Add additional predictors if needed
     if has_additional_predictors:
@@ -405,6 +516,18 @@ def predict(
         predictions = model.predict_proba(X_df)[:, 1]  # Probability of positive class
     else:
         raise ValueError(f"Unsupported model_type: {model_type}")
+
+    # Handle differential prediction: convert function differences to absolute values
+    if model_info.get("differential_prediction", False):
+        if hasattr(embedder, '_is_pairwise_differential') and embedder._is_pairwise_differential:
+            # For pairwise differential models, use stored reference function
+            reference_function = embedder._reference_function
+        else:
+            # For regular differential models, use model_info reference function
+            reference_function = model_info["reference_function"]
+        
+        logger.info(f"Converting differential predictions to absolute values using reference function: {reference_function}")
+        predictions = predictions + reference_function
 
     return predictions
 
@@ -486,6 +609,77 @@ def evaluate_model(
         raise ValueError(f"Unsupported model_type: {model_type}")
 
     return metrics
+
+
+def _generate_differential_training_data(
+    sequences: List[str],
+    functions: List[float],
+    reference_sequence: str,
+    reference_function: float,
+    random_seed: int = 42
+) -> tuple[List[tuple[str, str]], List[float]]:
+    """Generate differential training data from sequence-function pairs.
+    
+    This function creates a training dataset with all pairwise comparisons
+    between sequences. For each pair (seq_i, seq_j), the model learns to predict
+    func_i - func_j from embedding(seq_i) - embedding(seq_j).
+    
+    :param sequences: List of sequences
+    :param functions: List of corresponding function values
+    :param reference_sequence: Reference sequence for differential computation (used for prediction)
+    :param reference_function: Function value of reference sequence (used for prediction)
+    :param random_seed: Random seed for reproducibility
+    :return: Tuple of (sequence_pairs, function_differences)
+    """
+    import random
+    
+    # Set random seed for reproducibility
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+    
+    # Create all pairwise comparisons (n^2 pairs)
+    sequence_pairs = []
+    function_differences = []
+    
+    for i, (seq_i, func_i) in enumerate(zip(sequences, functions)):
+        for j, (seq_j, func_j) in enumerate(zip(sequences, functions)):
+            if i != j:  # Skip self-comparisons
+                sequence_pairs.append((seq_i, seq_j))
+                function_differences.append(func_i - func_j)  # Target: func_i - func_j
+    
+    logger.info(f"Generated {len(sequence_pairs)} differential training pairs (n^2 pairwise comparisons)")
+    
+    return sequence_pairs, function_differences
+
+
+def _select_reference_sequence(
+    sequences: List[str], 
+    functions: List[float],
+    strategy: str = "median"
+) -> tuple[str, float]:
+    """Select a reference sequence and function value.
+    
+    :param sequences: List of sequences
+    :param functions: List of corresponding function values
+    :param strategy: Strategy for selecting reference ("median", "mean", "random")
+    :return: Tuple of (reference_sequence, reference_function)
+    """
+    if strategy == "median":
+        # Select sequence with median function value
+        median_idx = np.argsort(functions)[len(functions) // 2]
+        return sequences[median_idx], functions[median_idx]
+    elif strategy == "mean":
+        # Select sequence closest to mean function value
+        mean_func = np.mean(functions)
+        closest_idx = np.argmin(np.abs(np.array(functions) - mean_func))
+        return sequences[closest_idx], functions[closest_idx]
+    elif strategy == "random":
+        # Select random sequence
+        import random
+        idx = random.randint(0, len(sequences) - 1)
+        return sequences[idx], functions[idx]
+    else:
+        raise ValueError(f"Unknown reference selection strategy: {strategy}")
 
 
 def _validate_additional_predictors(
