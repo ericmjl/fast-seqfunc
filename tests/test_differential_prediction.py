@@ -3,40 +3,24 @@
 
 import pandas as pd
 import numpy as np
-from fast_seqfunc import train_model, predict
+from fast_seqfunc import train_model, predict, generate_sequence_function_data, Alphabet
 
 def test_differential_prediction():
-    """Test basic differential prediction functionality."""
+    """Test differential prediction functionality using realistic protein data."""
     
-    # Create synthetic sequence-function data
-    sequences = [
-        "ACDEFG",
-        "ACDEFH", 
-        "ACDEFI",
-        "ACDEJG",
-        "ACDEJH",
-        "ACDEKI",
-        "BDEFGH",
-        "BDEFGI",
-        "BDEJGH",
-        "BDEJGI"
-    ]
+    # Set random seed for reproducible tests
+    np.random.seed(42)
     
-    # Create function values with some pattern
-    # Let's say function depends on sequence length and certain amino acids
-    functions = []
-    for seq in sequences:
-        func = len(seq) * 2.0  # Base function value
-        func += seq.count('A') * 1.5  # A amino acid bonus
-        func += seq.count('B') * 2.0  # B amino acid bonus
-        func += np.random.normal(0, 0.1)  # Small noise
-        functions.append(func)
-    
-    # Create training DataFrame
-    train_data = pd.DataFrame({
-        'sequence': sequences,
-        'function': functions
-    })
+    # Generate realistic protein sequence-function data
+    train_data = generate_sequence_function_data(
+        count=50,  # Smaller dataset for faster testing
+        sequence_length=12,  # Short peptides 
+        alphabet=Alphabet.protein(),
+        function_type="nonlinear",
+        noise_level=0.2,
+        position_weights=[2.0, 1.5, 1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.1],
+        motif_effects={"RGD": 3.0, "KKK": -2.0, "LLL": 1.5}  # Common peptide motifs
+    )
     
     print("Training data:")
     print(train_data)
@@ -57,8 +41,8 @@ def test_differential_prediction():
     print(f"Reference function: {model_info['reference_function']}")
     print()
     
-    # Test 2: Make predictions on new sequences
-    new_sequences = ["ACDEFX", "BDEJXY"]
+    # Test 2: Make predictions on new sequences (realistic protein sequences)
+    new_sequences = ["ACDEFGHIKLMN", "PQRSTVWYACDE"]  # Valid protein sequences
     predictions = predict(model_info, new_sequences)
     
     print("Predictions on new sequences:")
